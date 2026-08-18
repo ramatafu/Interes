@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- ВАЖНО: разрешения android.permission.INTERNET и ACCESS_NETWORK_STATE
+         намеренно НЕ объявлены. Без них ОС Android блокирует любой сетевой
+         доступ приложения на системном уровне — офлайн гарантирован не
+         только логикой кода, но и самой системой. -->
+
+    <!-- Разрешения на floating overlay (SYSTEM_ALERT_WINDOW), foreground-
+         сервис и POST_NOTIFICATIONS убраны: сейчас прозрачность — это
+         единый затухающий слой всего приложения (см. AppRoot.kt) поверх
+         translucent-темы (themes.xml), а не отдельное плавающее окно
+         поверх других приложений. -->
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="Interes"
+        android:theme="@style/Theme.Interes"
+        android:usesCleartextTraffic="false">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Interes">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+    </application>
+</manifest>

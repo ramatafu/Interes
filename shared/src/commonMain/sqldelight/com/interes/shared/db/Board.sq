@@ -1,0 +1,37 @@
+CREATE TABLE Board (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    category TEXT NOT NULL,
+    createdAt INTEGER NOT NULL
+);
+
+selectAllBoards:
+SELECT * FROM Board ORDER BY createdAt DESC;
+
+selectBoardById:
+SELECT * FROM Board WHERE id = ?;
+
+selectBoardsByCategory:
+SELECT * FROM Board WHERE category = ? ORDER BY createdAt DESC;
+
+insertBoard:
+INSERT INTO Board (title, category, createdAt) VALUES (?, ?, ?);
+
+deleteBoard:
+DELETE FROM Board WHERE id = ?;
+
+updateBoardTitle:
+UPDATE Board SET title = ? WHERE id = ?;
+
+-- Для карточек в списке досок: название/категория + путь к первому по
+-- порядку фото доски (если оно есть) как превью. LEFT JOIN — чтобы пустые
+-- доски (без фото) тоже попадали в список, просто с thumbnailPath = NULL.
+selectBoardsWithThumbnail:
+SELECT Board.id, Board.title, Board.category, Board.createdAt, Photo.filePath AS thumbnailPath
+FROM Board
+LEFT JOIN Photo ON Photo.boardId = Board.id
+    AND Photo.orderIndex = (SELECT MIN(p2.orderIndex) FROM Photo p2 WHERE p2.boardId = Board.id)
+ORDER BY Board.createdAt DESC;
+
+lastInsertRowId:
+SELECT last_insert_rowid();

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        windowIsTranslucent + прозрачный windowBackground — без этого
+        никакое уменьшение alpha в Compose не даст реальной прозрачности
+        до уровня рабочего стола Android. Compose может рисовать сколько
+        угодно "прозрачных" пикселей, но если формат самого окна Activity
+        непрозрачный (обычное поведение по умолчанию), система физически
+        не смешивает их с тем, что находится позади окна — в лучшем случае
+        получится чёрный/неопределённый цвет вместо просвечивающего рабочего
+        стола.
+
+        На остальных экранах (список досок, доска) это НИКАК не видно —
+        там Compose-контент сам рисует полностью непрозрачный Material
+        Surface на весь экран, так что просвечивать нечему. Эффект
+        проявляется только там, где мы сами намеренно уменьшаем alpha
+        (см. AppRoot.kt — общий затухающий слой всего приложения).
+    -->
+    <style name="Theme.Interes" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:colorBackgroundCacheHint">@null</item>
+    </style>
+</resources>

@@ -1,0 +1,43 @@
+[versions]
+# ВАЖНО: если у вас уже есть свой gradle/libs.versions.toml от мастера
+# Android Studio ("New Project"), в нём наверняка уже есть секция [versions]
+# с ключами agp/kotlin — сверьте их со значениями ниже. Если отличаются —
+# используйте те, что уже реально стоят у вас (то, что уже скачано и
+# зарезолвилось в вашем логе сборки), а не эти. Эти зафиксированы на
+# момент написания и совпадают с тем, что запросил ваш проект (agp 9.3.1
+# видно прямо в вашей ошибке сборки).
+agp = "9.3.1"
+kotlin = "2.4.10"
+composeMultiplatform = "1.11.1"
+sqldelight = "2.2.1"
+activityCompose = "1.13.0"
+coil3 = "3.5.0"
+coroutines = "1.9.0"
+
+[libraries]
+# Единая версия вместо дублирования строки "androidx.activity:activity-compose:X"
+# в shared/build.gradle.kts (androidMain) и androidApp/build.gradle.kts —
+# рассинхронизация версий в двух местах была реальной находкой при аудите.
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil3" }
+# SQLDelight — четыре артефакта, но одна версия на всех вместо четырёх
+# захардкоженных строк по разным source set'ам shared/build.gradle.kts.
+sqldelight-runtime = { module = "app.cash.sqldelight:runtime", version.ref = "sqldelight" }
+sqldelight-coroutines-extensions = { module = "app.cash.sqldelight:coroutines-extensions", version.ref = "sqldelight" }
+sqldelight-android-driver = { module = "app.cash.sqldelight:android-driver", version.ref = "sqldelight" }
+sqldelight-sqlite-driver = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqldelight" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+# Новый плагин для Android-таргета в KMP-модулях (AGP 9.0+). Обычный
+# com.android.library с kotlin("multiplatform") в одном модуле AGP 9.0+
+# больше не поддерживает.
+android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }
+# Компилятор Compose — с Kotlin 2.0+ это отдельный плагин, версия всегда
+# должна совпадать с версией Kotlin (не с версией Compose Multiplatform).
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }

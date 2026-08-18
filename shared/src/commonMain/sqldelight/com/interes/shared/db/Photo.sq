@@ -1,0 +1,40 @@
+CREATE TABLE Photo (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    boardId INTEGER NOT NULL,
+    filePath TEXT NOT NULL,
+    orderIndex INTEGER NOT NULL,
+    width INTEGER NOT NULL,
+    height INTEGER NOT NULL,
+    addedAt INTEGER NOT NULL,
+    FOREIGN KEY (boardId) REFERENCES Board(id) ON DELETE CASCADE
+);
+
+CREATE INDEX photo_board_order ON Photo(boardId, orderIndex);
+
+selectPhotosByBoard:
+SELECT * FROM Photo WHERE boardId = ? ORDER BY orderIndex ASC;
+
+selectPhotoById:
+SELECT * FROM Photo WHERE id = ?;
+
+-- Используется при добавлении фото: НЕ считаем количество строк (после
+-- удалений в середине списка это даёт задвоенный orderIndex — см.
+-- BoardRepository.addPhotoToBoard), а берём реальный максимум + 1.
+-- NULL, если фото в доске ещё нет.
+selectMaxOrderIndex:
+SELECT MAX(orderIndex) FROM Photo WHERE boardId = ?;
+
+insertPhoto:
+INSERT INTO Photo (boardId, filePath, orderIndex, width, height, addedAt)
+VALUES (?, ?, ?, ?, ?, ?);
+
+-- Используется при drag-n-drop: одной транзакцией переносим orderIndex
+-- конкретного фото на новое место.
+updatePhotoOrder:
+UPDATE Photo SET orderIndex = ? WHERE id = ?;
+
+deletePhoto:
+DELETE FROM Photo WHERE id = ?;
+
+lastInsertRowId:
+SELECT last_insert_rowid();
