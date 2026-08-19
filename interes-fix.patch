@@ -1,0 +1,294 @@
+diff --git a/.gitignore b/.gitignore
+index aa724b7..91dde36 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -9,6 +9,7 @@
+ /.idea/assetWizardSettings.xml
+ .DS_Store
+ /build
++**/build
+ /captures
+ .externalNativeBuild
+ .cxx
+diff --git a/desktopApp/build.gradle.kts b/desktopApp/build.gradle.kts
+index 09ad099..9bc0031 100644
+--- a/desktopApp/build.gradle.kts
++++ b/desktopApp/build.gradle.kts
+@@ -24,6 +24,24 @@ compose.desktop {
+             targetFormats(TargetFormat.Msi, TargetFormat.Exe)
+             packageName = "Interes"
+             packageVersion = "0.1.0"
++
++            // ВАЖНО: автоматическое определение нужных JDK-модулей (jdeps),
++            // которое Compose Desktop делает под капотом при сборке
++            // урезанного jlink-рантайма для .msi/.exe, не видит модули,
++            // подключаемые рефлексией/ServiceLoader — а именно так
++            // SQLite JDBC (org.sqlite.JDBC регистрируется через
++            // java.sql.DriverManager/ServiceLoader) и AWT FileDialog
++            // подключают часть своих зависимостей. Итог без этого флага —
++            // урезанный рантайм без java.sql/java.naming и т.п., и
++            // приложение падает с NoClassDefFoundError / ClassNotFoundException
++            // ДО того, как успевает открыть окно — то есть именно то
++            // молчаливое закрытие Interes.exe, о котором идёт речь.
++            // includeAllModules достаёт полный JDK в комплект — почти не
++            // раздувает MSI и полностью убирает этот класс ошибок.
++            windows {
++                includeAllModules = true
++                console = true
++            }
+         }
+     }
+ }
+diff --git a/desktopApp/src/jvmMain/kotlin/com/interes/desktop/Main.kt b/desktopApp/src/jvmMain/kotlin/com/interes/desktop/Main.kt
+deleted file mode 100644
+index 8921159..0000000
+--- a/desktopApp/src/jvmMain/kotlin/com/interes/desktop/Main.kt
++++ /dev/null
+@@ -1,117 +0,0 @@
+-package com.interes.desktop
+-
+-import androidx.compose.foundation.background
+-import androidx.compose.foundation.clickable
+-import androidx.compose.foundation.layout.Box
+-import androidx.compose.foundation.layout.Column
+-import androidx.compose.foundation.layout.Row
+-import androidx.compose.foundation.layout.fillMaxSize
+-import androidx.compose.foundation.layout.fillMaxWidth
+-import androidx.compose.foundation.layout.height
+-import androidx.compose.foundation.layout.padding
+-import androidx.compose.foundation.layout.size
+-import androidx.compose.foundation.layout.weight
+-import androidx.compose.material3.MaterialTheme
+-import androidx.compose.material3.Text
+-import androidx.compose.runtime.Composable
+-import androidx.compose.ui.Alignment
+-import androidx.compose.ui.Modifier
+-import androidx.compose.ui.graphics.Color
+-import androidx.compose.ui.unit.dp
+-import androidx.compose.ui.unit.sp
+-import androidx.compose.ui.window.Window
+-import androidx.compose.ui.window.WindowDraggableArea
+-import androidx.compose.ui.window.application
+-import androidx.compose.ui.window.rememberWindowState
+-import com.interes.shared.db.InteresDatabase
+-import com.interes.shared.repository.BoardRepository
+-import com.interes.shared.storage.DatabaseDriverFactory
+-import com.interes.shared.storage.PhotoFileStorage
+-import com.interes.shared.ui.InteresRoot
+-import kotlinx.coroutines.Dispatchers
+-
+-private val TITLE_BAR_HEIGHT = 36.dp
+-
+-/**
+- * Главное окно сделано undecorated + transparent намеренно — это плата за
+- * реальную прозрачность до уровня рабочего стола Windows (ползунок в
+- * просмотрщике фото, см. AppRoot.kt в shared-модуле). У Compose Desktop
+- * окно не может на лету переключаться между "обычное" и "прозрачное" —
+- * настройка фиксируется один раз при создании, поэтому всё окно приложения
+- * такое с самого начала, а не только пока открыт конкретный экран.
+- *
+- * Раз системной рамки больше нет — сделал свою тонкую панель сверху
+- * (заголовок + сворачивание + закрытие), она ВСЕГДА непрозрачна и не
+- * участвует в затухании остального контента.
+- */
+-fun main() = application {
+-    val driver = DatabaseDriverFactory().createDriver()
+-    val db = InteresDatabase(driver)
+-    val repository = BoardRepository(db, PhotoFileStorage(), Dispatchers.IO)
+-
+-    // Явный начальный размер — без него поведение undecorated-окна по
+-    // умолчанию менее предсказуемо, чем у обычного окна с рамкой.
+-    val windowState = rememberWindowState(width = 1100.dp, height = 750.dp)
+-
+-    Window(
+-        onCloseRequest = ::exitApplication,
+-        title = "Interes",
+-        undecorated = true,
+-        transparent = true,
+-        // ПРОВЕРИТЬ НА РЕАЛЬНОЙ МАШИНЕ: изменение размера undecorated-окна
+-        // перетаскиванием за край в Compose Desktop не всегда работает
+-        // "из коробки" так же надёжно, как у окна с системной рамкой —
+-        // поведение зависит от версии Compose Multiplatform/ОС. Если
+-        // потянуть за край не получается, понадобятся свои resize-хендлы
+-        // по краям (аналогично AppTitleBar ниже, только на drag с изменением
+-        // windowState.size вместо перемещения) — дайте знать, добавлю.
+-        resizable = true,
+-        state = windowState
+-    ) {
+-        Column(modifier = Modifier.fillMaxSize()) {
+-            AppTitleBar(
+-                onMinimize = { windowState.isMinimized = true },
+-                onClose = ::exitApplication
+-            )
+-            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+-                InteresRoot(repository)
+-            }
+-        }
+-    }
+-}
+-
+-@Composable
+-private fun AppTitleBar(onMinimize: () -> Unit, onClose: () -> Unit) {
+-    MaterialTheme {
+-        WindowDraggableArea {
+-            Row(
+-                modifier = Modifier
+-                    .fillMaxWidth()
+-                    .height(TITLE_BAR_HEIGHT)
+-                    .background(Color(0xFF1A1A2E)),
+-                verticalAlignment = Alignment.CenterVertically
+-            ) {
+-                Text(
+-                    "Interes",
+-                    color = Color.White,
+-                    fontSize = 13.sp,
+-                    modifier = Modifier.padding(start = 12.dp).weight(1f)
+-                )
+-                TitleBarButton(symbol = "\u2013", onClick = onMinimize)
+-                TitleBarButton(symbol = "\u2715", onClick = onClose)
+-            }
+-        }
+-    }
+-}
+-
+-@Composable
+-private fun TitleBarButton(symbol: String, onClick: () -> Unit) {
+-    Box(
+-        modifier = Modifier
+-            .size(TITLE_BAR_HEIGHT)
+-            .clickable(onClick = onClick),
+-        contentAlignment = Alignment.Center
+-    ) {
+-        Text(symbol, color = Color.White, fontSize = 14.sp)
+-    }
+-}
+diff --git a/desktopApp/src/main/kotlin/com/interes/desktop/Main.kt b/desktopApp/src/main/kotlin/com/interes/desktop/Main.kt
+index 5f7be4a..8921159 100644
+--- a/desktopApp/src/main/kotlin/com/interes/desktop/Main.kt
++++ b/desktopApp/src/main/kotlin/com/interes/desktop/Main.kt
+@@ -1,7 +1,28 @@
+ package com.interes.desktop
+ 
++import androidx.compose.foundation.background
++import androidx.compose.foundation.clickable
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.size
++import androidx.compose.foundation.layout.weight
++import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.Text
++import androidx.compose.runtime.Composable
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
+ import androidx.compose.ui.window.Window
++import androidx.compose.ui.window.WindowDraggableArea
+ import androidx.compose.ui.window.application
++import androidx.compose.ui.window.rememberWindowState
+ import com.interes.shared.db.InteresDatabase
+ import com.interes.shared.repository.BoardRepository
+ import com.interes.shared.storage.DatabaseDriverFactory
+@@ -9,15 +30,88 @@ import com.interes.shared.storage.PhotoFileStorage
+ import com.interes.shared.ui.InteresRoot
+ import kotlinx.coroutines.Dispatchers
+ 
++private val TITLE_BAR_HEIGHT = 36.dp
++
++/**
++ * Главное окно сделано undecorated + transparent намеренно — это плата за
++ * реальную прозрачность до уровня рабочего стола Windows (ползунок в
++ * просмотрщике фото, см. AppRoot.kt в shared-модуле). У Compose Desktop
++ * окно не может на лету переключаться между "обычное" и "прозрачное" —
++ * настройка фиксируется один раз при создании, поэтому всё окно приложения
++ * такое с самого начала, а не только пока открыт конкретный экран.
++ *
++ * Раз системной рамки больше нет — сделал свою тонкую панель сверху
++ * (заголовок + сворачивание + закрытие), она ВСЕГДА непрозрачна и не
++ * участвует в затухании остального контента.
++ */
+ fun main() = application {
+     val driver = DatabaseDriverFactory().createDriver()
+     val db = InteresDatabase(driver)
+-    val repository = BoardRepository(db, PhotoFileStorage(), ioDispatcher = Dispatchers.IO)
++    val repository = BoardRepository(db, PhotoFileStorage(), Dispatchers.IO)
++
++    // Явный начальный размер — без него поведение undecorated-окна по
++    // умолчанию менее предсказуемо, чем у обычного окна с рамкой.
++    val windowState = rememberWindowState(width = 1100.dp, height = 750.dp)
+ 
+     Window(
+         onCloseRequest = ::exitApplication,
+-        title = "Interes"
++        title = "Interes",
++        undecorated = true,
++        transparent = true,
++        // ПРОВЕРИТЬ НА РЕАЛЬНОЙ МАШИНЕ: изменение размера undecorated-окна
++        // перетаскиванием за край в Compose Desktop не всегда работает
++        // "из коробки" так же надёжно, как у окна с системной рамкой —
++        // поведение зависит от версии Compose Multiplatform/ОС. Если
++        // потянуть за край не получается, понадобятся свои resize-хендлы
++        // по краям (аналогично AppTitleBar ниже, только на drag с изменением
++        // windowState.size вместо перемещения) — дайте знать, добавлю.
++        resizable = true,
++        state = windowState
++    ) {
++        Column(modifier = Modifier.fillMaxSize()) {
++            AppTitleBar(
++                onMinimize = { windowState.isMinimized = true },
++                onClose = ::exitApplication
++            )
++            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
++                InteresRoot(repository)
++            }
++        }
++    }
++}
++
++@Composable
++private fun AppTitleBar(onMinimize: () -> Unit, onClose: () -> Unit) {
++    MaterialTheme {
++        WindowDraggableArea {
++            Row(
++                modifier = Modifier
++                    .fillMaxWidth()
++                    .height(TITLE_BAR_HEIGHT)
++                    .background(Color(0xFF1A1A2E)),
++                verticalAlignment = Alignment.CenterVertically
++            ) {
++                Text(
++                    "Interes",
++                    color = Color.White,
++                    fontSize = 13.sp,
++                    modifier = Modifier.padding(start = 12.dp).weight(1f)
++                )
++                TitleBarButton(symbol = "\u2013", onClick = onMinimize)
++                TitleBarButton(symbol = "\u2715", onClick = onClose)
++            }
++        }
++    }
++}
++
++@Composable
++private fun TitleBarButton(symbol: String, onClick: () -> Unit) {
++    Box(
++        modifier = Modifier
++            .size(TITLE_BAR_HEIGHT)
++            .clickable(onClick = onClick),
++        contentAlignment = Alignment.Center
+     ) {
+-        InteresRoot(repository)
++        Text(symbol, color = Color.White, fontSize = 14.sp)
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/gradlew b/gradlew
+old mode 100644
+new mode 100755

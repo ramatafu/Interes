@@ -68,8 +68,14 @@ class BoardRepository(
         // НЕ count(*) — после удаления фото из середины списка это даст
         // задвоенный orderIndex (например: было [0,1,2,3], удалили индекс 2,
         // осталось [0,1,3] — три строки, count()==3, но 3 уже занят).
-        // Берём реальный максимум + 1.
-        val nextOrder = (db.photoQueries.selectMaxOrderIndex(boardId).executeAsOne() ?: -1L) + 1L
+        // Берём реальный максимум + 1. Считаем его в Kotlin по уже типизированным
+        // строкам Photo (selectPhotosByBoard), а не через отдельный SQL-запрос
+        // с голым MAX(...): SQLDelight 2.2.1 оборачивает такой безымянный
+        // агрегат в сгенерированный data class (SelectMaxOrderIndex.MAX: Long?)
+        // вместо простого Long? — из-за этого исходный код не компилировался
+        // ("None of the following candidates is applicable" на operator plus).
+        val nextOrder = (db.photoQueries.selectPhotosByBoard(boardId).executeAsList()
+            .maxOfOrNull { it.orderIndex } ?: -1L) + 1L
         db.photoQueries.insertPhoto(
             boardId, imported.storedPath, nextOrder,
             imported.width.toLong(), imported.height.toLong(), currentTimeMillis()

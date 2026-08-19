@@ -27,11 +27,27 @@ kotlin {
                 implementation(libs.sqldelight.coroutines.extensions)
                 implementation(libs.kotlinx.coroutines.core)
 
-                // UI (доска, сетка, drag-n-drop) — общий код для Android и Desktop
-                implementation(compose.runtime)
-                implementation(compose.ui)
-                implementation(compose.foundation)
-                implementation(compose.material3)
+                // UI (доска, сетка, drag-n-drop) — общий код для Android и Desktop.
+                // ВАЖНО: api, а не implementation. desktopApp зависит от
+                // :shared через project(":shared") и сам напрямую вызывает
+                // Compose-композаблы (AppTitleBar в Main.kt использует Row/
+                // Column/Modifier.weight из foundation). При implementation
+                // здесь desktopApp эти Compose-зависимости не наследует и
+                // резолвит Compose САМ, отдельным графом — на практике версии
+                // расходятся (в репозитории есть собранная ранее папка app/ с
+                // буквально задвоенными jar'ами: runtime-desktop-1.11.1 И
+                // runtime-desktop-1.11.2, savedstate-compose-desktop-1.3.6 И
+                // 1.4.0 и т.д. одновременно). Из-за этого при сборке
+                // desktopApp падает с "Cannot access ... it is internal in
+                // file" (Modifier.weight) и "Unresolved reference
+                // WindowDraggableArea" — компилятор просто видит два разных,
+                // несовместимых набора классов Compose. api гарантирует, что
+                // desktopApp получит ТОТ ЖЕ граф зависимостей, на котором
+                // скомпилирован :shared.
+                api(compose.runtime)
+                api(compose.ui)
+                api(compose.foundation)
+                api(compose.material3)
 
                 // Загрузка изображений с локального диска, мультиплатформенно.
                 // Сетевой модуль (coil-network-*) намеренно не подключаем —

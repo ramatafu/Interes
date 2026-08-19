@@ -13,10 +13,6 @@ kotlin {
 dependencies {
     implementation(project(":shared"))
     implementation(compose.desktop.currentOs)
-    // foundation/ui/runtime приходят транзитивно из :shared (там теперь
-    // api, см. shared/build.gradle.kts) — тем же графом версий, которым
-    // скомпилирован :shared. material3 дублирован намеренно: desktopApp
-    // использует MaterialTheme в AppTitleBar напрямую.
     implementation(compose.material3)
 }
 

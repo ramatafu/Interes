@@ -17,13 +17,6 @@ SELECT * FROM Photo WHERE boardId = ? ORDER BY orderIndex ASC;
 selectPhotoById:
 SELECT * FROM Photo WHERE id = ?;
 
--- Используется при добавлении фото: НЕ считаем количество строк (после
--- удалений в середине списка это даёт задвоенный orderIndex — см.
--- BoardRepository.addPhotoToBoard), а берём реальный максимум + 1.
--- NULL, если фото в доске ещё нет.
-selectMaxOrderIndex:
-SELECT MAX(orderIndex) FROM Photo WHERE boardId = ?;
-
 insertPhoto:
 INSERT INTO Photo (boardId, filePath, orderIndex, width, height, addedAt)
 VALUES (?, ?, ?, ?, ?, ?);
