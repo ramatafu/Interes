@@ -6,17 +6,21 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -43,12 +47,16 @@ import coil3.request.crossfade
 import coil3.size.Size
 import com.interes.shared.model.BoardSummary
 import com.interes.shared.repository.BoardRepository
+import com.interes.shared.util.localFilePathToUri
 import kotlinx.coroutines.launch
 
 /**
- * Стартовый экран: карточки всех досок. Долгое нажатие на карточку
- * открывает меню "Переименовать / Удалить", кнопка "+" создаёт новую доску
- * и сразу в неё переходит.
+ * Стартовый экран: карточки всех досок. Долгое нажатие на карточку ИЛИ
+ * кнопка "⋮" в её углу открывает меню "Переименовать / Удалить" (кнопка —
+ * потому что "долгое нажатие" мышью на десктопе неочевидно и легко
+ * пропустить; с ней действие остаётся доступным и по клику). Кнопка "+"
+ * создаёт новую доску и сразу в неё переходит. Поле поиска в тулбаре
+ * фильтрует доски по названию и категории на лету, без запроса к БД.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,13 +68,61 @@ fun BoardsListScreen(
     val scope = rememberCoroutineScope()
 
     var showCreateDialog by remember { mutableStateOf(false) }
-    // Доска, для которой долгим нажатием вызвали меню действий.
+    // Доска, для которой долгим нажатием (или кнопкой "⋮") вызвали меню действий.
     var actionsFor by remember { mutableStateOf<BoardSummary?>(null) }
     var renamingBoard by remember { mutableStateOf<BoardSummary?>(null) }
     var deletingBoard by remember { mutableStateOf<BoardSummary?>(null) }
 
+    // Поиск досок. showSearchField отдельно от searchQuery: значок лупы
+    // разворачивает поле поиска в тулбаре, крестик его закрывает и
+    // одновременно сбрасывает запрос — так после закрытия поиска список
+    // не остаётся молча отфильтрованным по прошлому запросу.
+    var showSearchField by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    val visibleBoards = if (searchQuery.isBlank()) {
+        boards
+    } else {
+        boards.filter {
+            it.title.contains(searchQuery, ignoreCase = true) ||
+                it.category.contains(searchQuery, ignoreCase = true)
+        }
+    }
+
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Interes") }) },
+        topBar = {
+            TopAppBar(
+                title = {
+                    if (showSearchField) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text("Поиск досок") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    } else {
+                        Text("Interes")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = {
+                        if (showSearchField) {
+                            showSearchField = false
+                            searchQuery = ""
+                        } else {
+                            showSearchField = true
+                        }
+                    }) {
+                        // Без material-icons-extended — лупа/крестик текстом,
+                        // тем же приёмом, что стрелка "назад" в BoardScreen.
+                        Text(
+                            if (showSearchField) "\u2715" else "\uD83D\uDD0D",
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                    }
+                }
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(onClick = { showCreateDialog = true }) {
                 Text("+", style = MaterialTheme.typography.headlineSmall)
@@ -80,6 +136,13 @@ fun BoardsListScreen(
             ) {
                 Text("Пока нет ни одной доски — нажмите \"+\", чтобы создать первую")
             }
+        } else if (visibleBoards.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Ничего не найдено по запросу \"$searchQuery\"")
+            }
         } else {
             LazyVerticalGrid(
                 // Adaptive вместо Fixed(2): на телефоне это по факту даёт те
@@ -92,11 +155,12 @@ fun BoardsListScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(boards, key = { it.id }) { board ->
+                items(visibleBoards, key = { it.id }) { board ->
                     BoardCard(
                         board = board,
                         onClick = { onOpenBoard(board.id) },
-                        onLongPress = { actionsFor = board }
+                        onLongPress = { actionsFor = board },
+                        onActionsClick = { actionsFor = board }
                     )
                 }
             }
@@ -175,7 +239,8 @@ fun BoardsListScreen(
 private fun BoardCard(
     board: BoardSummary,
     onClick: () -> Unit,
-    onLongPress: () -> Unit
+    onLongPress: () -> Unit,
+    onActionsClick: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -195,7 +260,7 @@ private fun BoardCard(
             AsyncImage(
                 model = remember(board.thumbnailPath) {
                     ImageRequest.Builder(context)
-                        .data("file://${board.thumbnailPath}")
+                        .data(localFilePathToUri(board.thumbnailPath))
                         .memoryCacheKey(board.thumbnailPath)
                         .diskCacheKey(board.thumbnailPath)
                         .size(Size(480, 480))
@@ -208,8 +273,24 @@ private fun BoardCard(
             )
         }
 
-        // Тёмная подложка снизу + название/категория поверх — читаемо
-        // и на пустой доске (без превью), и поверх светлого фото.
+        // Кнопка меню действий — видимая альтернатива долгому нажатию
+        // (на десктопе с мышью "долгое нажатие" неочевидно). Отдельный
+        // pointerInput на самой кнопке не нужен: IconButton сам глотает
+        // клик и не даёт ему всплыть до onTap внешнего Box.
+        IconButton(
+            onClick = onActionsClick,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(4.dp)
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha = 0.35f))
+        ) {
+            Text("\u22EE", color = Color.White, style = MaterialTheme.typography.titleMedium)
+        }
+
+        // Тёмная подложка снизу + название/категория/счётчик фото поверх —
+        // читаемо и на пустой доске (без превью), и поверх светлого фото.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -219,7 +300,17 @@ private fun BoardCard(
         ) {
             Column {
                 Text(board.title, color = Color.White, style = MaterialTheme.typography.titleSmall)
-                Text(board.category, color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall)
+                Row {
+                    Text(board.category, color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        // "фото" в русском не склоняется по числам (1 фото,
+                        // 2 фото, 5 фото — везде одна форма), поэтому без
+                        // отдельной логики множественного числа.
+                        " · ${board.photoCount} фото",
+                        color = Color.White.copy(alpha = 0.8f),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             }
         }
     }

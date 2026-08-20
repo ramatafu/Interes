@@ -41,8 +41,22 @@ import com.interes.shared.repository.BoardRepository
  */
 @Composable
 fun InteresRoot(repository: BoardRepository) {
-    val boardSummaries by repository.observeBoardSummaries().collectAsState(initial = emptyList())
-    val allBoards by repository.observeBoards().collectAsState(initial = emptyList())
+    // remember(repository) — ВАЖНО, а не просто repository.observeX().collectAsState()
+    // напрямую. repository.observeBoardSummaries()/observeBoards() строят
+    // НОВУЮ цепочку Flow при каждом вызове. Без remember каждая перерисовка
+    // InteresRoot (а она перерисовывается именно при получении новых данных
+    // из этих же Flow — читает boardSummaries/allBoards) создавала бы
+    // Flow-объект заново; collectAsState видит "другой" Flow как смену ключа
+    // и перезапускает сбор с нуля (сброс на initial = emptyList()) — из-за
+    // этого перерисовка догоняла сама себя быстрее, чем БД успевала вернуть
+    // актуальные данные, и список визуально никогда не "устаканивался" на
+    // новом состоянии. Ровно это и выглядело как "фото не добавляется":
+    // на самом деле фото исправно попадало в БД, но экран крутился в этом
+    // цикле сброс-пересбор и не показывал итог.
+    val boardSummariesFlow = remember(repository) { repository.observeBoardSummaries() }
+    val allBoardsFlow = remember(repository) { repository.observeBoards() }
+    val boardSummaries by boardSummariesFlow.collectAsState(initial = emptyList())
+    val allBoards by allBoardsFlow.collectAsState(initial = emptyList())
 
     // null = показан список досок; иначе id открытой доски.
     var selectedBoardId by remember { mutableStateOf<Long?>(null) }

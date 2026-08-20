@@ -30,7 +30,7 @@ class BoardRepository(
             .asFlow()
             .mapToList(ioDispatcher)
             .map { rows ->
-                rows.map { BoardSummary(it.id, it.title, it.category, it.createdAt, it.thumbnailPath) }
+                rows.map { BoardSummary(it.id, it.title, it.category, it.createdAt, it.thumbnailPath, it.photoCount.toInt()) }
             }
 
     fun observePhotos(boardId: Long): Flow<List<Photo>> =

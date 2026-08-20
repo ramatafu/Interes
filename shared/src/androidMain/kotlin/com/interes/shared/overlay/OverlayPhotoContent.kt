@@ -29,6 +29,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.interes.shared.util.localFilePathToUri
 
 private val PHOTO_SIZE = 220.dp
 
@@ -56,7 +57,7 @@ internal fun OverlayPhotoContent(
         Column {
             Box {
                 AsyncImage(
-                    model = "file://$photoPath",
+                    model = localFilePathToUri(photoPath),
                     contentDescription = null,
                     modifier = Modifier
                         .size(PHOTO_SIZE)

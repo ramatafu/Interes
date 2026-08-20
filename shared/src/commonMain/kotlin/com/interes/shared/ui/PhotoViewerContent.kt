@@ -27,6 +27,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
 import com.interes.shared.model.Photo
+import com.interes.shared.util.localFilePathToUri
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
@@ -113,7 +114,7 @@ private fun ZoomableImage(
         contentAlignment = Alignment.Center
     ) {
         AsyncImage(
-            model = "file://${photo.filePath}",
+            model = localFilePathToUri(photo.filePath),
             contentDescription = null,
             contentScale = ContentScale.Fit,
             modifier = Modifier

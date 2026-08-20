@@ -34,6 +34,7 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.size.Size
 import com.interes.shared.model.Photo
+import com.interes.shared.util.localFilePathToUri
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
@@ -211,7 +212,7 @@ fun PhotoBoardGrid(
                 AsyncImage(
                     model = remember(photo.filePath) {
                         ImageRequest.Builder(context)
-                            .data("file://${photo.filePath}")
+                            .data(localFilePathToUri(photo.filePath))
                             .memoryCacheKey(photo.filePath)
                             .diskCacheKey(photo.filePath)
                             // Декодируем сразу под размер миниатюры, а не в

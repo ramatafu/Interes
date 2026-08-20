@@ -11,6 +11,15 @@ actual fun rememberImagePicker(onPicked: (List<String>) -> Unit): () -> Unit {
         {
             val dialog = FileDialog(null as Frame?, "Выберите фото", FileDialog.LOAD)
             dialog.isMultipleMode = true
+            // FileDialog.setFilenameFilter официально не работает в
+            // Windows-реализации AWT (см. javadoc самого метода: "Filename
+            // filters do not function in Sun's reference implementation for
+            // Microsoft Windows") — на Windows этот колбэк просто никогда не
+            // вызывается, и диалог показывает вообще все файлы независимо от
+            // фильтра. Оставляем его для macOS/Linux, где он действительно
+            // работает, но на Windows полагаемся на dialog.file — маску,
+            // которую нативный диалог Windows понимает сам.
+            dialog.file = "*.jpg;*.jpeg;*.png;*.bmp;*.gif"
             dialog.setFilenameFilter { _, name ->
                 // .webp сюда намеренно НЕ включён: стандартный javax.imageio.ImageIO
                 // (см. PhotoFileStorage.desktop.kt — используется для определения

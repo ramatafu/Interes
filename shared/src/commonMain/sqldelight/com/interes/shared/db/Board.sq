@@ -24,10 +24,12 @@ updateBoardTitle:
 UPDATE Board SET title = ? WHERE id = ?;
 
 -- Для карточек в списке досок: название/категория + путь к первому по
--- порядку фото доски (если оно есть) как превью. LEFT JOIN — чтобы пустые
--- доски (без фото) тоже попадали в список, просто с thumbnailPath = NULL.
+-- порядку фото доски (если оно есть) как превью, плюс общее количество
+-- фото в доске. LEFT JOIN на превью — чтобы пустые доски (без фото) тоже
+-- попадали в список, просто с thumbnailPath = NULL и photoCount = 0.
 selectBoardsWithThumbnail:
-SELECT Board.id, Board.title, Board.category, Board.createdAt, Photo.filePath AS thumbnailPath
+SELECT Board.id, Board.title, Board.category, Board.createdAt, Photo.filePath AS thumbnailPath,
+    (SELECT COUNT(*) FROM Photo p3 WHERE p3.boardId = Board.id) AS photoCount
 FROM Board
 LEFT JOIN Photo ON Photo.boardId = Board.id
     AND Photo.orderIndex = (SELECT MIN(p2.orderIndex) FROM Photo p2 WHERE p2.boardId = Board.id)
