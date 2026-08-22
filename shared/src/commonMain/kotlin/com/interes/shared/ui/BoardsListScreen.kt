@@ -63,7 +63,10 @@ import kotlinx.coroutines.launch
 fun BoardsListScreen(
     boards: List<BoardSummary>,
     repository: BoardRepository,
-    onOpenBoard: (Long) -> Unit
+    onOpenBoard: (Long) -> Unit,
+    onOpenSettings: () -> Unit,
+    nativeWindowController: NativeWindowController,
+    onExitApp: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
 
@@ -101,7 +104,13 @@ fun BoardsListScreen(
                             modifier = Modifier.fillMaxWidth()
                         )
                     } else {
-                        Text("Interes")
+                        // windowDragHandle — тут, а не на всю TopAppBar: поле
+                        // поиска, кнопки лупы/шестерёнки/закрытия должны
+                        // оставаться кликабельными, а не пытаться таскать
+                        // окно при каждом клике по ним. Захватывать можно
+                        // только за сам текст заголовка — как за настоящую
+                        // title bar.
+                        Text("Interes", modifier = Modifier.windowDragHandle(nativeWindowController))
                     }
                 },
                 actions = {
@@ -119,6 +128,32 @@ fun BoardsListScreen(
                             if (showSearchField) "\u2715" else "\uD83D\uDD0D",
                             style = MaterialTheme.typography.titleLarge
                         )
+                    }
+                    // Настройки и закрытие приложения скрываем, пока открыто
+                    // поле поиска — иначе в узком окне тулбар начинает
+                    // теснить текстовое поле.
+                    if (!showSearchField) {
+                        IconButton(onClick = onOpenSettings) {
+                            Text("\u2699", style = MaterialTheme.typography.titleLarge)
+                        }
+                        // Замена системной кнопки "развернуть" — двойной
+                        // клик по заголовку тоже разворачивает (см.
+                        // windowDragHandle), эта кнопка — просто более
+                        // очевидная альтернатива для тех, кто не додумается
+                        // до двойного клика по надписи "Interes".
+                        IconButton(onClick = { nativeWindowController.toggleMaximize() }) {
+                            Text("\u2750", style = MaterialTheme.typography.titleLarge)
+                        }
+                        // Единственный способ закрыть приложение из UI теперь,
+                        // когда у окна нет системной рамки (undecorated,
+                        // см. Main.kt) — раньше был системный крестик в углу
+                        // окна. Alt+F4 по-прежнему тоже работает (это
+                        // системный шорткат ОС, не завязанный на видимую
+                        // title bar), но кнопка в интерфейсе нужна для тех,
+                        // кто про Alt+F4 не вспомнит.
+                        IconButton(onClick = onExitApp) {
+                            Text("\u2715", style = MaterialTheme.typography.titleLarge)
+                        }
                     }
                 }
             )

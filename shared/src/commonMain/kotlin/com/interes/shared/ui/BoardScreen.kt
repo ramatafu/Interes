@@ -31,7 +31,8 @@ fun BoardScreen(
     boardTitle: String,
     repository: BoardRepository,
     onBack: () -> Unit,
-    onPhotoClick: (photos: List<Photo>, index: Int) -> Unit
+    onPhotoClick: (photos: List<Photo>, index: Int) -> Unit,
+    nativeWindowController: NativeWindowController
 ) {
     // remember(boardId) — та же причина, что и в AppRoot.kt: без него
     // каждая перерисовка BoardScreen (а она перерисовывается именно когда
@@ -78,7 +79,10 @@ fun BoardScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(boardTitle) },
+                title = {
+                    // windowDragHandle — см. тот же приём в BoardsListScreen.kt.
+                    Text(boardTitle, modifier = Modifier.windowDragHandle(nativeWindowController))
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         // Без material-icons-extended — просто стрелка текстом.
