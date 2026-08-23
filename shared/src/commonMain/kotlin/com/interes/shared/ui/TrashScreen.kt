@@ -56,7 +56,7 @@ fun TrashScreen(
         topBar = {
             TopAppBar(
                 modifier = Modifier.height(TopToolbarHeight),
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = SideToolbarColor),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = TopToolbarColor),
                 title = {
                     // windowDragHandle — см. тот же приём в BoardsListScreen.kt.
                     Text("Корзина", modifier = Modifier.windowDragHandle(nativeWindowController))

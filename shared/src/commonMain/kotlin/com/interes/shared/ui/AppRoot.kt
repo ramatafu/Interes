@@ -196,7 +196,7 @@ fun InteresRoot(
             // тулбаров, и всего остального. Их размер: ширина ровно как у
             // соответствующего тулбара (ToolbarWidth / RightToolbarWidth),
             // высота — как у верхней панели (TopToolbarHeight, одинаковая у
-            // всех трёх экранов). Цвет — SideToolbarColor (92B1B7), тот же,
+            // всех трёх экранов). Цвет — TopToolbarColor, тот же,
             // что и у самой верхней панели (см. BoardsListScreen.kt,
             // BoardScreen.kt, TrashScreen.kt).
             //
@@ -211,14 +211,14 @@ fun InteresRoot(
                     .align(Alignment.TopStart)
                     .width(ToolbarWidth)
                     .height(TopToolbarHeight)
-                    .background(SideToolbarColor)
+                    .background(TopToolbarColor)
             )
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .width(RightToolbarWidth)
                     .height(TopToolbarHeight)
-                    .background(SideToolbarColor)
+                    .background(TopToolbarColor)
             )
         }
 

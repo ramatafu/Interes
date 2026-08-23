@@ -30,6 +30,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -131,7 +132,7 @@ fun BoardsListScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(TopToolbarHeight)
-                    .background(SideToolbarColor)
+                    .background(TopToolbarColor)
                     .windowDragHandle(nativeWindowController)
             ) {
                 // Значок + название приложения — слева, на той же
@@ -161,11 +162,22 @@ fun BoardsListScreen(
 
                 if (showSearchField) {
                     // Режим поиска: строка поиска досок + крестик закрытия.
+                    // Форма и заливка — по образцу рендера в чате: скруглённая
+                    // "таблетка" полупрозрачным белым поверх цвета панели,
+                    // а не стандартный прямоугольный OutlinedTextField.
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
-                        placeholder = { Text("Поиск досок") },
+                        placeholder = { Text("Поиск доски...") },
+                        leadingIcon = { SearchGlyph(color = MaterialTheme.colorScheme.onSurface) },
                         singleLine = true,
+                        shape = RoundedCornerShape(50),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedContainerColor = Color.White.copy(alpha = 0.35f),
+                            unfocusedContainerColor = Color.White.copy(alpha = 0.35f)
+                        ),
                         modifier = Modifier
                             .align(Alignment.CenterStart)
                             .fillMaxWidth()
@@ -181,7 +193,7 @@ fun BoardsListScreen(
                             },
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("\u2715", style = MaterialTheme.typography.titleLarge)
+                        CloseGlyph()
                     }
                 } else {
                     // Группа кнопок справа: лупа, ровно 60 dp, затем
@@ -194,7 +206,7 @@ fun BoardsListScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Лупа — при нажатии появляется строка поиска досок.
-                        TopBarGlyph(symbol = "\uD83D\uDD0D") { showSearchField = true }
+                        TopBarGlyph(onClick = { showSearchField = true }) { SearchGlyph() }
 
                         // Ровно 60 dp между лупой и кнопкой "Свернуть" — по ТЗ.
                         // Кнопки — глифы без внутренних отступов, поэтому
@@ -203,16 +215,16 @@ fun BoardsListScreen(
 
                         // Свернуть — замена системной кнопки "_", которой
                         // больше нет у окна без рамки (undecorated, см. Main.kt).
-                        TopBarGlyph(symbol = "\u2212") { nativeWindowController.minimize() }
+                        TopBarGlyph(onClick = { nativeWindowController.minimize() }) { MinimizeGlyph() }
                         Spacer(modifier = Modifier.width(12.dp))
                         // Развернуть/восстановить — замена системной кнопки
                         // "квадратик".
-                        TopBarGlyph(symbol = "\u2750") { nativeWindowController.toggleMaximize() }
+                        TopBarGlyph(onClick = { nativeWindowController.toggleMaximize() }) { MaximizeGlyph() }
                         Spacer(modifier = Modifier.width(12.dp))
                         // Закрыть. Alt+F4 по-прежнему тоже работает (системный
                         // шорткат ОС), но кнопка в интерфейсе нужна для тех,
                         // кто про Alt+F4 не вспомнит.
-                        TopBarGlyph(symbol = "\u2715") { onExitApp() }
+                        TopBarGlyph(onClick = onExitApp) { CloseGlyph() }
                     }
                 }
             }
@@ -347,14 +359,14 @@ fun BoardsListScreen(
  * рядом даёт честные 60 dp между лупой и "Свернуть".
  */
 @Composable
-private fun TopBarGlyph(symbol: String, onClick: () -> Unit) {
+private fun TopBarGlyph(onClick: () -> Unit, content: @Composable () -> Unit) {
     Box(
         modifier = Modifier
-            .height(40.dp)
+            .size(40.dp)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Text(symbol, style = MaterialTheme.typography.titleLarge)
+        content()
     }
 }
 

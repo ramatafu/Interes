@@ -19,8 +19,20 @@ import org.jetbrains.compose.resources.Font
  */
 val AppPrimaryColor = Color(0xFF0088CC)
 
-/** Цвет фона левого и правого тулбаров (SideToolbar.kt, RightToolbar.kt). */
-val SideToolbarColor = Color(0xFF92B1B7)
+/**
+ * Цвет фона левого и правого тулбаров (SideToolbar.kt, RightToolbar.kt), а
+ * также низа/фонов экранов (BottomAppBar, containerColor у Scaffold в
+ * BoardsListScreen/BoardScreen/TrashScreen) — взят из образца
+ * "Цвет_левого_тулбара.jpg" (см. чат).
+ */
+val SideToolbarColor = Color(0xFF273540)
+
+/**
+ * Цвет верхней панели на всех трёх экранах — чуть темнее SideToolbarColor,
+ * взят из отдельного образца "Цвет_верхнего_тулбара.jpg" (см. чат): в
+ * рендере верхняя панель и боковая — близкие, но не идентичные оттенки.
+ */
+val TopToolbarColor = Color(0xFF1C2932)
 
 private val AppPrimaryContainerColor = Color(0xFFB3DBF0)
 
