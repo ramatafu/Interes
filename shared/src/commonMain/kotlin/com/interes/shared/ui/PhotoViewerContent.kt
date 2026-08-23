@@ -17,7 +17,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
@@ -39,7 +38,9 @@ fun PhotoViewerContent(
 
     HorizontalPager(
         state = pagerState,
-        modifier = modifier.fillMaxSize().background(Color.Black),
+        // Фон вокруг фото (когда снимок не заполняет весь экран из-за
+        // соотношения сторон) — тот же цвет, что и у тулбаров: 92B1B7.
+        modifier = modifier.fillMaxSize().background(SideToolbarColor),
         userScrollEnabled = currentScale <= 1.01f
     ) { page ->
         ZoomableImage(

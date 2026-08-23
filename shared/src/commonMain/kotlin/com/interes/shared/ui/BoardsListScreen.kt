@@ -118,6 +118,9 @@ fun BoardsListScreen(
     }
 
     Scaffold(
+        // Фон экрана целиком (позади сетки карточек досок/"комнат") —
+        // тот же цвет, что и у тулбаров: 92B1B7.
+        containerColor = SideToolbarColor,
         topBar = {
             // Вся панель — одна перетаскиваемая область: зажатие мышью в
             // любом свободном месте двигает окно (windowDragHandle). Кнопки
@@ -127,7 +130,7 @@ fun BoardsListScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(TopToolbarHeight)
-                    .background(MaterialTheme.colorScheme.surface)
+                    .background(SideToolbarColor)
                     .windowDragHandle(nativeWindowController)
             ) {
                 // Иконка приложения — слева, поверх перетаскиваемой области.
@@ -218,7 +221,7 @@ fun BoardsListScreen(
             // разметки.
             if (boards.isNotEmpty()) {
                 val totalPhotos = boards.sumOf { it.photoCount }
-                BottomAppBar {
+                BottomAppBar(containerColor = SideToolbarColor) {
                     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                         Text(
                             "${boards.size} ${boardsWord(boards.size)} • $totalPhotos ${photosWord(totalPhotos)}",

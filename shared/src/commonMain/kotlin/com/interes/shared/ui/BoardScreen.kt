@@ -13,6 +13,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -78,9 +79,13 @@ fun BoardScreen(
     }
 
     Scaffold(
+        // Фон экрана целиком (позади сетки фото внутри доски) — тот же
+        // цвет, что и у тулбаров: 92B1B7.
+        containerColor = SideToolbarColor,
         topBar = {
             TopAppBar(
                 modifier = Modifier.height(TopToolbarHeight),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = SideToolbarColor),
                 title = {
                     // windowDragHandle — см. тот же приём в BoardsListScreen.kt.
                     Text(boardTitle, modifier = Modifier.windowDragHandle(nativeWindowController))

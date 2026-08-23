@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -196,11 +195,10 @@ fun InteresRoot(
             // Заполнители углов — рисуются ПОСЛЕДНИМИ, то есть поверх и
             // тулбаров, и всего остального. Их размер: ширина ровно как у
             // соответствующего тулбара (ToolbarWidth / RightToolbarWidth),
-            // высота — как у верхней панели (TopToolbarHeight, теперь
-            // одинаковая у всех трёх экранов). Цвет — тот же, что у самой
-            // верхней панели (MaterialTheme.colorScheme.surface — и явный
-            // фон у BoardsListScreen, и цвет по умолчанию у material3
-            // TopAppBar в BoardScreen/TrashScreen).
+            // высота — как у верхней панели (TopToolbarHeight, одинаковая у
+            // всех трёх экранов). Цвет — SideToolbarColor (92B1B7), тот же,
+            // что и у самой верхней панели (см. BoardsListScreen.kt,
+            // BoardScreen.kt, TrashScreen.kt).
             //
             // Так верхняя панель визуально "дотягивается" до самых краёв
             // окна и ложится поверх верхних углов боковых тулбаров, а сами
@@ -213,14 +211,14 @@ fun InteresRoot(
                     .align(Alignment.TopStart)
                     .width(ToolbarWidth)
                     .height(TopToolbarHeight)
-                    .background(MaterialTheme.colorScheme.surface)
+                    .background(SideToolbarColor)
             )
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .width(RightToolbarWidth)
                     .height(TopToolbarHeight)
-                    .background(MaterialTheme.colorScheme.surface)
+                    .background(SideToolbarColor)
             )
         }
 
