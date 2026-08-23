@@ -3,14 +3,10 @@ package com.interes.shared.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -20,56 +16,43 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+/**
+ * Элементы управления просмотрщика. Нарисованы СНАРУЖИ затухающего слоя
+ * (AppRoot.kt), поэтому всегда полностью непрозрачны.
+ *
+ * Раскладка:
+ * - счётчик "1 / 2" — сверху СЛЕВА;
+ * - кнопка закрытия ✕ — сверху СПРАВА.
+ *
+ * ВАЖНО: Box обязан быть fillMaxSize(), иначе он сожмётся до размера
+ * кнопок и оба элемента прилипнут к левому верхнему углу (align работает
+ * ВНУТРИ границ этого Box).
+ */
 @Composable
 fun PhotoViewerControls(
     pageCount: Int,
     currentPage: Int,
-    opacityPercent: Float,
-    onOpacityChange: (Float) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(modifier = modifier) {
-        // Ползунок прозрачности — ВНИЗУ фотографии ПО ЦЕНТРУ.
-        // Нарисован СНАРУЖИ затухающего слоя (AppRoot.kt), поэтому
-        // НИКОГДА не становится прозрачным при перемещении.
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 20.dp)
-                .clip(CircleShape)
-                .background(Color.Black.copy(alpha = 0.45f))
-                .padding(horizontal = 24.dp, vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("${opacityPercent.toInt()}%", color = Color.White, fontSize = 12.sp)
-                Text(
-                    "${currentPage + 1} / $pageCount",
-                    color = Color.White,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(start = 16.dp)
-                )
-            }
-            Slider(
-                value = opacityPercent,
-                onValueChange = onOpacityChange,
-                valueRange = 0f..100f,
-                colors = SliderDefaults.colors(
-                    thumbColor = Color.White,
-                    activeTrackColor = Color.White
-                ),
-                modifier = Modifier
-                    .width(320.dp)
-                    .padding(top = 4.dp)
-            )
-        }
-
-        // Кнопка "Закрыть" — СПРАВА от фотографии, на той же высоте, что и ползунок.
+    Box(modifier = modifier.fillMaxSize()) {
+        // Счётчик страниц — сверху слева.
         Box(
             modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = 20.dp)
+                .align(Alignment.TopStart)
+                .padding(16.dp)
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha = 0.45f))
+                .padding(horizontal = 12.dp, vertical = 6.dp)
+        ) {
+            Text("${currentPage + 1} / $pageCount", color = Color.White, fontSize = 14.sp)
+        }
+
+        // Кнопка "Закрыть" — сверху СПРАВА.
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp)
                 .size(48.dp)
                 .clip(CircleShape)
                 .background(Color.Black.copy(alpha = 0.45f))

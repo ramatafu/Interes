@@ -1,9 +1,10 @@
 package com.interes.shared.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -38,7 +39,6 @@ fun SideToolbar(
     backupPaths: BackupPaths,
     onOpenTrash: () -> Unit,
     // Стрелка "предыдущее фото" — видна только когда можно листнуть влево.
-    // null = стрелка не показывается (не открыт просмотрщик или первая страница).
     onPrevPhoto: (() -> Unit)? = null
 ) {
     var backupMenuExpanded by remember { mutableStateOf(false) }
@@ -61,15 +61,22 @@ fun SideToolbar(
         )
     }
 
-    Column(
+    // Box вместо Column: верхняя группа прижата к верху, нижняя — к низу,
+    // а стрелка ◀ стоит ТОЧНО по центру высоты. Правый тулбар использует ту
+    // же схему — поэтому его стрелка ▶ оказывается на том же уровне.
+    Box(
         modifier = modifier
             .width(ToolbarWidth)
+            .fillMaxHeight()
             .background(AppPrimaryColor)
-            .padding(vertical = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .padding(top = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Text(
                 "Interes",
                 color = Color.White,
@@ -103,13 +110,30 @@ fun SideToolbar(
             ToolbarIconButton(symbol = "\u2139", contentDescription = "О программе", onClick = { showInfoDialog = true })
         }
 
-        // Стрелка "предыдущее фото" — появляется здесь когда открыт просмотрщик
-        // и есть предыдущее фото. Нарисована на тулбаре = никогда не прозрачнеет.
+        // Стрелка "предыдущее фото" — ТОЧНО по центру высоты окна.
         if (onPrevPhoto != null) {
-            ToolbarIconButton(symbol = "\u25C0", contentDescription = "Предыдущее фото", onClick = onPrevPhoto)
+            IconButton(
+                onClick = onPrevPhoto,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(48.dp)
+            ) {
+                Text(
+                    "\u25C0",
+                    color = Color.White,
+                    style = MaterialTheme.typography.headlineSmall,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
 
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             HorizontalDivider(color = Color.White.copy(alpha = 0.3f), modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
             ToolbarIconButton(symbol = "\uD83D\uDDD1", contentDescription = "Корзина", onClick = onOpenTrash)
         }

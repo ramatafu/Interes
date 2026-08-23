@@ -61,8 +61,7 @@ fun InteresRoot(
 
     InteresTheme {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Поднимаем pagerState сюда, чтобы он был доступен и внутри
-            // контента, и при создании лямбд для тулбаров ниже.
+            // pagerState поднят сюда: доступен и контенту, и лямбдам тулбаров.
             val currentViewerState = viewerState
             val pagerState = if (currentViewerState != null) {
                 rememberPagerState(initialPage = currentViewerState.second) { currentViewerState.first.size }
@@ -77,6 +76,7 @@ fun InteresRoot(
                     .fillMaxSize()
                     .padding(start = ToolbarWidth, end = RightToolbarWidth)
             ) {
+                // Затухающий слой: прозрачность гасит ТОЛЬКО контент.
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -134,15 +134,13 @@ fun InteresRoot(
                     PhotoViewerControls(
                         pageCount = currentViewerState.first.size,
                         currentPage = pagerState.currentPage,
-                        opacityPercent = appOpacityPercent,
-                        onOpacityChange = { appOpacityPercent = it },
                         onDismiss = { viewerState = null }
                     )
                 }
             }
 
-            // Лямбды пролистывания — null когда просмотрщик закрыт или нельзя
-            // листнуть в эту сторону; тогда стрелка на тулбаре не рисуется.
+            // Стрелки листания: null, когда листнуть нельзя или просмотрщик
+            // закрыт — тогда стрелка на тулбаре не рисуется.
             val onPrevPhoto: (() -> Unit)? = if (pagerState != null && pagerState.currentPage > 0) {
                 {
                     scope.launch {
@@ -163,7 +161,7 @@ fun InteresRoot(
                 }
             } else null
 
-            // Левый тулбар со стрелкой ◀ (когда можно листнуть влево).
+            // Левый тулбар со стрелкой ◀.
             SideToolbar(
                 modifier = Modifier.fillMaxHeight().align(Alignment.CenterStart),
                 onHome = goHome,
@@ -173,10 +171,15 @@ fun InteresRoot(
                 onPrevPhoto = onPrevPhoto
             )
 
-            // Правый тулбар со стрелкой ▶ (когда можно листнуть вправо).
+            // Правый тулбар: стрелка ▶ + вертикальный ползунок прозрачности
+            // (ползунок виден только при открытом просмотрщике).
             RightToolbar(
                 modifier = Modifier.fillMaxHeight().align(Alignment.CenterEnd),
-                onNextPhoto = onNextPhoto
+                onNextPhoto = onNextPhoto,
+                opacityPercent = if (pagerState != null) appOpacityPercent else null,
+                onOpacityChange = if (pagerState != null) {
+                    { appOpacityPercent = it }
+                } else null
             )
         }
 
