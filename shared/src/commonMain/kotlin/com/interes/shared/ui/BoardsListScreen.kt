@@ -1,5 +1,6 @@
 package com.interes.shared.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -52,15 +53,23 @@ import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.size.Size
+import com.interes.shared.generated.resources.Res
+import com.interes.shared.generated.resources.app_icon
 import com.interes.shared.model.BoardSummary
 import com.interes.shared.repository.BoardRepository
 import com.interes.shared.util.localFilePathToUri
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.painterResource
 
 // Высота верхнего тулбара — фиксированная, чтобы панель НЕ растягивалась
 // на всё окно (старый TopAppBar с Box(fillMaxSize()) в title именно этим
 // и болел: кнопки уезжали в середину окна).
-private val TopToolbarHeight: Dp = 56.dp
+/**
+ * Высота верхней панели — используется не только здесь, но и в AppRoot.kt
+ * (см. заполнители углов, из-за которых верхняя панель визуально ложится
+ * поверх боковых тулбаров), поэтому не private.
+ */
+val TopToolbarHeight: Dp = 56.dp
 
 /**
  * Стартовый экран: карточки всех досок. Долгое нажатие на карточку ИЛИ
@@ -121,6 +130,20 @@ fun BoardsListScreen(
                     .background(MaterialTheme.colorScheme.surface)
                     .windowDragHandle(nativeWindowController)
             ) {
+                // Иконка приложения — слева, поверх перетаскиваемой области.
+                // Скрыта в режиме поиска: там на этом месте разворачивается
+                // на всю ширину поле поиска (см. ветку showSearchField ниже).
+                if (!showSearchField) {
+                    Image(
+                        painter = painterResource(Res.drawable.app_icon),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .padding(start = 16.dp)
+                            .size(28.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                    )
+                }
                 if (showSearchField) {
                     // Режим поиска: строка поиска досок + крестик закрытия.
                     OutlinedTextField(

@@ -5,15 +5,22 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import com.interes.shared.generated.resources.Res
+import com.interes.shared.generated.resources.inter_bold
+import com.interes.shared.generated.resources.inter_medium
+import com.interes.shared.generated.resources.inter_regular
+import org.jetbrains.compose.resources.Font
 
 /**
  * Единственное место во всём приложении, где задаются фирменный цвет и
  * шрифт — оба по ТЗ фиксированные (без переключения темы).
- * 
- * ВНИМАНИЕ: шрифт Inter временно отключён из-за проблем с компиляцией.
- * Будет подключен позже отдельным обновлением.
  */
 val AppPrimaryColor = Color(0xFF0088CC)
+
+/** Цвет фона левого и правого тулбаров (SideToolbar.kt, RightToolbar.kt). */
+val SideToolbarColor = Color(0xFF92B1B7)
 
 private val AppPrimaryContainerColor = Color(0xFFB3DBF0)
 
@@ -30,10 +37,46 @@ private val AppColorScheme = lightColorScheme(
     onTertiary = Color.White
 )
 
+/**
+ * Inter — три начертания, зарегистрированные под своими FontWeight, чтобы
+ * bold/medium текст (headline, title, label) не подменялся системным
+ * жирным начертанием regular-шрифта, а брал реальный inter_bold/inter_medium.
+ */
+@Composable
+private fun interFontFamily(): FontFamily = FontFamily(
+    Font(Res.font.inter_regular, weight = FontWeight.Normal),
+    Font(Res.font.inter_medium, weight = FontWeight.Medium),
+    Font(Res.font.inter_bold, weight = FontWeight.Bold)
+)
+
+@Composable
+private fun appTypography(): Typography {
+    val inter = interFontFamily()
+    val base = Typography()
+    return Typography(
+        displayLarge = base.displayLarge.copy(fontFamily = inter),
+        displayMedium = base.displayMedium.copy(fontFamily = inter),
+        displaySmall = base.displaySmall.copy(fontFamily = inter),
+        headlineLarge = base.headlineLarge.copy(fontFamily = inter),
+        headlineMedium = base.headlineMedium.copy(fontFamily = inter),
+        headlineSmall = base.headlineSmall.copy(fontFamily = inter),
+        titleLarge = base.titleLarge.copy(fontFamily = inter),
+        titleMedium = base.titleMedium.copy(fontFamily = inter),
+        titleSmall = base.titleSmall.copy(fontFamily = inter),
+        bodyLarge = base.bodyLarge.copy(fontFamily = inter),
+        bodyMedium = base.bodyMedium.copy(fontFamily = inter),
+        bodySmall = base.bodySmall.copy(fontFamily = inter),
+        labelLarge = base.labelLarge.copy(fontFamily = inter),
+        labelMedium = base.labelMedium.copy(fontFamily = inter),
+        labelSmall = base.labelSmall.copy(fontFamily = inter)
+    )
+}
+
 @Composable
 fun InteresTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = AppColorScheme,
+        typography = appTypography(),
         content = content
     )
 }

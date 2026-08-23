@@ -1,10 +1,14 @@
 package com.interes.shared.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -71,6 +75,35 @@ fun InteresRoot(
                 LaunchedEffect(pagerState.currentPage) { appOpacityPercent = 100f }
             }
 
+            // Стрелки листания: null, когда листнуть нельзя или просмотрщик
+            // закрыт — тогда стрелка на тулбаре не рисуется.
+            val onPrevPhoto: (() -> Unit)? = if (pagerState != null && pagerState.currentPage > 0) {
+                {
+                    scope.launch {
+                        pagerState.animateScrollToPage(
+                            (pagerState.currentPage - 1).coerceAtLeast(0)
+                        )
+                    }
+                }
+            } else null
+
+            val onNextPhoto: (() -> Unit)? = if (pagerState != null && pagerState.currentPage < pagerState.pageCount - 1) {
+                {
+                    scope.launch {
+                        pagerState.animateScrollToPage(
+                            (pagerState.currentPage + 1).coerceAtMost(pagerState.pageCount - 1)
+                        )
+                    }
+                }
+            } else null
+
+            // Контент — с тем же горизонтальным паддингом, что и раньше:
+            // тулбары должны оставаться видимыми на всю свою высоту, а не
+            // только ниже верхней панели, поэтому тело каждого экрана
+            // по-прежнему инсетится здесь целиком (а не по кускам внутри
+            // самих экранов, как было в промежуточной версии — та версия
+            // ошибочно растягивала Surface на всё окно и закрывала тулбары
+            // целиком, а не только сверху).
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -139,28 +172,6 @@ fun InteresRoot(
                 }
             }
 
-            // Стрелки листания: null, когда листнуть нельзя или просмотрщик
-            // закрыт — тогда стрелка на тулбаре не рисуется.
-            val onPrevPhoto: (() -> Unit)? = if (pagerState != null && pagerState.currentPage > 0) {
-                {
-                    scope.launch {
-                        pagerState.animateScrollToPage(
-                            (pagerState.currentPage - 1).coerceAtLeast(0)
-                        )
-                    }
-                }
-            } else null
-
-            val onNextPhoto: (() -> Unit)? = if (pagerState != null && pagerState.currentPage < pagerState.pageCount - 1) {
-                {
-                    scope.launch {
-                        pagerState.animateScrollToPage(
-                            (pagerState.currentPage + 1).coerceAtMost(pagerState.pageCount - 1)
-                        )
-                    }
-                }
-            } else null
-
             // Левый тулбар со стрелкой ◀.
             SideToolbar(
                 modifier = Modifier.fillMaxHeight().align(Alignment.CenterStart),
@@ -180,6 +191,36 @@ fun InteresRoot(
                 onOpacityChange = if (pagerState != null) {
                     { appOpacityPercent = it }
                 } else null
+            )
+
+            // Заполнители углов — рисуются ПОСЛЕДНИМИ, то есть поверх и
+            // тулбаров, и всего остального. Их размер: ширина ровно как у
+            // соответствующего тулбара (ToolbarWidth / RightToolbarWidth),
+            // высота — как у верхней панели (TopToolbarHeight, теперь
+            // одинаковая у всех трёх экранов). Цвет — тот же, что у самой
+            // верхней панели (MaterialTheme.colorScheme.surface — и явный
+            // фон у BoardsListScreen, и цвет по умолчанию у material3
+            // TopAppBar в BoardScreen/TrashScreen).
+            //
+            // Так верхняя панель визуально "дотягивается" до самых краёв
+            // окна и ложится поверх верхних углов боковых тулбаров, а сами
+            // тулбары остаются полностью рабочими и видимыми ниже этой
+            // полосы — в отличие от предыдущей попытки, где Surface с
+            // контентом занимал всё окно целиком и закрывал тулбары
+            // полностью, а не только сверху.
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .width(ToolbarWidth)
+                    .height(TopToolbarHeight)
+                    .background(MaterialTheme.colorScheme.surface)
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .width(RightToolbarWidth)
+                    .height(TopToolbarHeight)
+                    .background(MaterialTheme.colorScheme.surface)
             )
         }
 

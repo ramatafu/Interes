@@ -54,10 +54,16 @@ kotlin {
                 // приложение офлайн, грузим только локальные file:// пути.
                 implementation(libs.coil.compose)
 
-                // Шрифт Inter (см. AppTheme.kt) — грузится из
-                // commonMain/composeResources/font/ через сгенерированный
-                // Res-класс, для этого нужна именно эта зависимость.
-                implementation(compose.components.resources)
+                // Шрифт Inter (см. AppTheme.kt) и иконка приложения (см.
+                // BoardsListScreen.kt, desktopApp/Main.kt) — грузятся из
+                // commonMain/composeResources/ через сгенерированный
+                // Res-класс. api, а не implementation — по той же причине,
+                // что и для compose.ui/foundation/material3 выше:
+                // desktopApp напрямую использует Res.drawable.app_icon в
+                // своём Main.kt, а значит тип DrawableResource должен быть
+                // на его собственном compile-classpath, а не только на
+                // рантайм-classpath через project(":shared").
+                api(compose.components.resources)
             }
         }
         val androidMain by getting {
@@ -91,4 +97,12 @@ compose.resources {
     // держать его в одном стиле с остальными пакетами проекта
     // (com.interes.shared.*).
     packageOfResClass = "com.interes.shared.generated.resources"
+
+    // По умолчанию сгенерированный класс Res — internal, виден только
+    // внутри :shared. desktopApp обращается к Res.drawable.app_icon
+    // напрямую из своего Main.kt (иконка окна/панели задач), а BoardsListScreen
+    // здесь же, в :shared, к внутренней видимости и так был бы нечувствителен —
+    // проблема именно в межмодульном доступе. Без этого флага сборка падает:
+    // "Cannot access 'object Res : Any': it is internal in file".
+    publicResClass = true
 }

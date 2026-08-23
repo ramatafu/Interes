@@ -45,6 +45,10 @@ compose.desktop {
             windows {
                 includeAllModules = true
                 console = true
+                // Иконка .exe / ярлыка на рабочем столе / в панели задач
+                // после установки (не иконка окна во время работы — та
+                // задаётся отдельно через Window(icon = ...) в Main.kt).
+                iconFile.set(project.file("src/main/resources/app_icon.ico"))
             }
         }
     }

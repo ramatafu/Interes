@@ -52,7 +52,7 @@ fun RightToolbar(
         modifier = modifier
             .width(RightToolbarWidth)
             .fillMaxHeight()
-            .background(AppPrimaryColor)
+            .background(SideToolbarColor)
     ) {
         // Стрелка "следующее фото" — ТОЧНО по центру высоты окна,
         // на том же уровне, что и стрелка ◀ на левом тулбаре.

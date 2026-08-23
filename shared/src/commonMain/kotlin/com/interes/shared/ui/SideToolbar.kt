@@ -67,7 +67,7 @@ fun SideToolbar(
         modifier = modifier
             .width(ToolbarWidth)
             .fillMaxHeight()
-            .background(AppPrimaryColor)
+            .background(SideToolbarColor)
     ) {
         // Верхняя группа — опущена на 110 dp от верха,
         // расстояние между кнопками +15 dp (spacedBy(15.dp)).
