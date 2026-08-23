@@ -1,5 +1,9 @@
 package com.interes.desktop
 
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import com.interes.shared.db.InteresDatabase
@@ -9,34 +13,9 @@ import com.interes.shared.storage.DatabaseDriverFactory
 import com.interes.shared.storage.PhotoFileStorage
 import com.interes.shared.ui.InteresRoot
 import com.interes.shared.ui.NativeWindowController
+import com.interes.shared.ui.ViewerKeys
 import kotlinx.coroutines.Dispatchers
 
-/**
- * undecorated = true — ОБЯЗАТЕЛЬНОЕ условие для настоящей прозрачности окна
- * на Windows. java.awt.Window.setOpacity(float) (см. NativeWindowController.desktop.kt)
- * бросает IllegalComponentStateException при значении меньше 1.0f на ОБЫЧНОМ
- * (decorated) окне — задокументированное ограничение самого AWT, не баг
- * этого проекта: https://docs.oracle.com/javase/8/docs/api/java/awt/Frame.html
- * ("IllegalComponentStateException - if undecorated is false, and this frame
- * opacity is less than 1.0f"). Раньше это исключение тихо проглатывалось
- * runCatching{} внутри setOpacityPercent — ползунок двигался, а окно
- * оставалось полностью непрозрачным без единой видимой ошибки.
- *
- * НЕ transparent = true — это другая, ненужная здесь настройка (попиксельная
- * прозрачность конкретных участков окна — например, чтобы вырезать окно
- * фигурной формы). Нам нужна равномерная прозрачность ВСЕГО окна разом —
- * ровно то, что даёт window.opacity без transparent.
- *
- * Раз убрали системную рамку — вместе с ней пропали стандартные
- * возможности Windows двигать/закрывать окно за title bar. Компенсировано
- * в самом приложении: перетаскивание — зажатием и перетаскиванием заголовка
- * в верхней панели любого экрана (см. TopAppBar в BoardsListScreen.kt/
- * BoardScreen.kt/TrashScreen.kt — там Modifier.pointerInput +
- * detectDragGestures двигают nativeWindowController), закрытие — иконка "✕"
- * в тулбаре списка досок (onExitApp) ИЛИ штатное для Windows Alt+F4
- * (работает независимо от наличия рамки — это системный шорткат уровня ОС,
- * не завязанный на видимую title bar).
- */
 fun main() = application {
     val driver = DatabaseDriverFactory().createDriver()
     val db = InteresDatabase(driver)
@@ -46,11 +25,29 @@ fun main() = application {
     Window(
         onCloseRequest = ::exitApplication,
         title = "Interes",
-        undecorated = true
+        undecorated = true,
+        transparent = true,
+        // Пролистывание просмотрщика с клавиатуры: ← / →.
+        // Ловим на уровне ОКНА — фокус на фото не нужен.
+        // Работает только пока открыт просмотрщик (иначе лямбды null).
+        onPreviewKeyEvent = { event ->
+            if (event.type == KeyEventType.KeyDown) {
+                val handler = when (event.key) {
+                    Key.DirectionLeft -> ViewerKeys.onLeft
+                    Key.DirectionRight -> ViewerKeys.onRight
+                    else -> null
+                }
+                if (handler != null) {
+                    handler()
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        }
     ) {
-        // window — из WindowScope, доступен только внутри этого блока,
-        // поэтому NativeWindowController создаётся именно здесь, а не
-        // выше вместе с остальными зависимостями.
         val nativeWindowController = NativeWindowController(window)
         InteresRoot(repository, backupPaths, nativeWindowController, onExitApp = ::exitApplication)
     }

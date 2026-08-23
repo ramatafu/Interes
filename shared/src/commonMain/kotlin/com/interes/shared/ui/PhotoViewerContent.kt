@@ -3,8 +3,6 @@ package com.interes.shared.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.calculatePan
-import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,25 +20,15 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerInputScope
-import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
 import com.interes.shared.model.Photo
 import com.interes.shared.util.localFilePathToUri
+import kotlin.math.hypot
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
-/**
- * Сам просмотрщик — свайп между фото + pinch-to-zoom/пан + двойной тап.
- * НЕ содержит элементов управления (кнопка закрытия/счётчик/ползунок
- * прозрачности) — они рисуются отдельным composable (PhotoViewerControls)
- * поверх этого, вне затухающего слоя всего приложения. Такое разделение
- * специально: прозрачность должна применяться не только к самому
- * просмотрщику, а ко ВСЕМУ содержимому приложения разом (см. AppRoot.kt),
- * а элементы управления должны оставаться видимыми при любом значении
- * прозрачности — иначе нечем было бы вернуть её обратно.
- */
 @Composable
 fun PhotoViewerContent(
     photos: List<Photo>,
@@ -76,9 +64,6 @@ private fun ZoomableImage(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            // Тап (двойной) и zoom/pan объединены в ОДИН pointerInput с двумя
-            // сопрограммами — два отдельных pointerInput-модификатора на
-            // одном узле конкурируют за один поток касаний.
             .pointerInput(photo.id) {
                 coroutineScope {
                     launch {
@@ -94,13 +79,6 @@ private fun ZoomableImage(
                         )
                     }
                     launch {
-                        // ВАЖНО: обычный detectTransformGestures потребляет
-                        // ЛЮБОЕ перемещение пальца как pan — включая простой
-                        // одиночный свайп влево/вправо, даже без увеличения.
-                        // Здесь жест потребляется ТОЛЬКО когда это реально
-                        // масштабирование (2+ пальца) или фото уже увеличено
-                        // (scale > 1) — иначе одиночный свайп проходит мимо,
-                        // к родительскому HorizontalPager.
                         detectZoomAndPanWhenActive(
                             isAlreadyZoomed = { scale > 1f }
                         ) { pan, zoom ->
@@ -129,51 +107,46 @@ private fun ZoomableImage(
     }
 }
 
-/**
- * Как detectTransformGestures, но НЕ потребляет жест, если это одиночный
- * палец без масштабирования и фото ещё не увеличено — тогда событие
- * остаётся непотреблённым и достаётся родительскому HorizontalPager,
- * который интерпретирует его как обычный свайп между страницами.
- */
 private suspend fun PointerInputScope.detectZoomAndPanWhenActive(
     isAlreadyZoomed: () -> Boolean,
     onGesture: (pan: Offset, zoom: Float) -> Unit
 ) {
     awaitEachGesture {
-        var pastTouchSlop = false
-        var accumulatedZoom = 1f
-        val touchSlop = viewConfiguration.touchSlop
+        val down = awaitFirstDown(requireUnconsumed = false)
+        var prev = mapOf(down.id to down.position)
 
-        awaitFirstDown(requireUnconsumed = false)
-        do {
+        while (true) {
             val event = awaitPointerEvent()
-            val anyConsumed = event.changes.any { it.isConsumed }
-            if (!anyConsumed) {
-                val zoomChange = event.calculateZoom()
-                val panChange = event.calculatePan()
-                val pointerCount = event.changes.size
+            val pressed = event.changes.filter { it.pressed }
+            if (pressed.isEmpty()) break
 
-                if (!pastTouchSlop) {
-                    accumulatedZoom *= zoomChange
-                    if (accumulatedZoom != 1f || panChange.getDistance() > touchSlop) {
-                        pastTouchSlop = true
-                    }
-                }
+            val zoomed = isAlreadyZoomed()
+            if (pressed.size >= 2 || zoomed) {
+                event.changes.forEach { if (it.pressed) it.consume() }
 
-                if (pastTouchSlop) {
-                    val shouldHandleHere = pointerCount > 1 || isAlreadyZoomed()
-                    if (shouldHandleHere) {
-                        if (zoomChange != 1f || panChange != Offset.Zero) {
-                            onGesture(panChange, zoomChange)
-                        }
-                        event.changes.forEach { change ->
-                            if (change.positionChanged()) change.consume()
-                        }
+                if (pressed.size >= 2) {
+                    val a = pressed[0]
+                    val b = pressed[1]
+                    val pa = prev[a.id]
+                    val pb = prev[b.id]
+                    if (pa != null && pb != null) {
+                        val prevDist = hypot(pa.x - pb.x, pa.y - pb.y)
+                        val curDist = hypot(a.position.x - b.position.x, a.position.y - b.position.y)
+                        val zoom = if (prevDist > 1f) curDist / prevDist else 1f
+                        val pan = Offset(
+                            ((a.position.x - pa.x) + (b.position.x - pb.x)) / 2f,
+                            ((a.position.y - pa.y) + (b.position.y - pb.y)) / 2f
+                        )
+                        onGesture(pan, zoom)
                     }
-                    // Иначе (одиночный палец, не увеличено) — намеренно
-                    // ничего не consume-им, жест уходит родителю.
+                } else {
+                    val p = pressed[0]
+                    val pp = prev[p.id]
+                    if (pp != null) onGesture(p.position - pp, 1f)
                 }
             }
-        } while (!anyConsumed && event.changes.any { it.pressed })
+
+            prev = pressed.associate { it.id to it.position }
+        }
     }
 }

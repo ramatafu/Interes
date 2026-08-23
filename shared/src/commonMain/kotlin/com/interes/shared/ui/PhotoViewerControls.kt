@@ -4,7 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -17,34 +17,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// Ширина полосы слева, зарезервированной под вертикальный ползунок —
-// используется и здесь (для размещения самого ползунка), и в AppRoot.kt
-// (там на столько же нужно сдвинуть вправо саму фотографию, чтобы
-// ползунок не наезжал на неё, а стоял РЯДОМ, как и просили).
-val PhotoViewerSliderAreaWidth: Dp = 64.dp
-
-/**
- * Кнопка закрытия, счётчик "3 / 12" и ползунок прозрачности (0–100%).
- * Рисуется ОТДЕЛЬНО от затухающего слоя всего приложения (см. AppRoot.kt) —
- * эти элементы должны оставаться полностью видимыми при ЛЮБОМ значении
- * ползунка, иначе при значении около 0% нечем было бы вернуть прозрачность
- * обратно или закрыть просмотрщик.
- *
- * Ползунок — СЛЕВА от фотографии (по просьбе), не поверх неё: сама
- * фотография в AppRoot.kt сдвинута вправо на PhotoViewerSliderAreaWidth
- * паддингом, освобождая эту полосу. Вертикальная ориентация — Material3
- * Slider горизонтальный по умолчанию, разворот через graphicsLayer +
- * layout{} (стандартный для Compose приём получить вертикальный слайдер;
- * без сторонних библиотек).
- */
 @Composable
 fun PhotoViewerControls(
     pageCount: Int,
@@ -52,14 +27,52 @@ fun PhotoViewerControls(
     opacityPercent: Float,
     onOpacityChange: (Float) -> Unit,
     onDismiss: () -> Unit,
+    onPreviousPage: () -> Unit,
+    onNextPage: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier) {
+        // Ползунок прозрачности — ВНИЗУ фотографии ПО ЦЕНТРУ.
+        // Нарисован СНАРУЖИ затухающего слоя (AppRoot.kt), поэтому
+        // НИКОГДА не становится прозрачным при перемещении.
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 20.dp)
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha = 0.45f))
+                .padding(horizontal = 24.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("${opacityPercent.toInt()}%", color = Color.White, fontSize = 12.sp)
+                Text(
+                    "${currentPage + 1} / $pageCount",
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(start = 16.dp)
+                )
+            }
+            Slider(
+                value = opacityPercent,
+                onValueChange = onOpacityChange,
+                valueRange = 0f..100f,
+                colors = SliderDefaults.colors(
+                    thumbColor = Color.White,
+                    activeTrackColor = Color.White
+                ),
+                modifier = Modifier
+                    .width(320.dp)
+                    .padding(top = 4.dp)
+            )
+        }
+
+        // Кнопка "Закрыть" — СПРАВА от фотографии, на той же высоте, что и ползунок.
         Box(
             modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(16.dp)
-                .size(40.dp)
+                .align(Alignment.BottomEnd)
+                .padding(end = 16.dp, bottom = 20.dp)
+                .size(48.dp)
                 .clip(CircleShape)
                 .background(Color.Black.copy(alpha = 0.45f))
                 .clickable(onClick = onDismiss),
@@ -68,75 +81,32 @@ fun PhotoViewerControls(
             Text("\u2715", color = Color.White, fontSize = 20.sp)
         }
 
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(16.dp)
-                .clip(CircleShape)
-                .background(Color.Black.copy(alpha = 0.45f))
-                .padding(horizontal = 12.dp, vertical = 6.dp)
-        ) {
-            Text("${currentPage + 1} / $pageCount", color = Color.White, fontSize = 14.sp)
+        // Стрелка "предыдущее" — СЛЕВА от фотографии, по центру высоты.
+        if (currentPage > 0) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(12.dp)
+                    .size(56.dp)
+                    .clickable(onClick = onPreviousPage),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("\u25C0", color = Color.White.copy(alpha = 0.6f), fontSize = 40.sp)
+            }
         }
 
-        Column(
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .width(PhotoViewerSliderAreaWidth)
-                .padding(vertical = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text("${opacityPercent.toInt()}%", color = Color.White, fontSize = 12.sp)
-            VerticalSlider(
-                value = opacityPercent,
-                onValueChange = onOpacityChange,
-                valueRange = 0f..100f,
+        // Стрелка "следующее" — СПРАВА от фотографии, по центру высоты.
+        if (currentPage < pageCount - 1) {
+            Box(
                 modifier = Modifier
-                    .height(220.dp)
-                    .padding(top = 4.dp)
-            )
+                    .align(Alignment.CenterEnd)
+                    .padding(12.dp)
+                    .size(56.dp)
+                    .clickable(onClick = onNextPage),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("\u25B6", color = Color.White.copy(alpha = 0.6f), fontSize = 40.sp)
+            }
         }
     }
-}
-
-/**
- * Обычный Material3 Slider, повёрнутый на 90°. layout{} меняет местами
- * измеренные ширину/высоту ДО поворота — иначе повёрнутый (визуально
- * вертикальный) слайдер занимал бы в разметке место как горизонтальный
- * (широкий и низкий), обрезаясь по факту.
- */
-@Composable
-private fun VerticalSlider(
-    value: Float,
-    onValueChange: (Float) -> Unit,
-    valueRange: ClosedFloatingPointRange<Float>,
-    modifier: Modifier = Modifier
-) {
-    Slider(
-        value = value,
-        onValueChange = onValueChange,
-        valueRange = valueRange,
-        colors = SliderDefaults.colors(
-            thumbColor = Color.White,
-            activeTrackColor = Color.White
-        ),
-        modifier = modifier
-            .graphicsLayer {
-                rotationZ = 270f
-                transformOrigin = TransformOrigin(0f, 0f)
-            }
-            .layout { measurable, constraints ->
-                val placeable = measurable.measure(
-                    Constraints(
-                        minWidth = constraints.minHeight,
-                        maxWidth = constraints.maxHeight,
-                        minHeight = constraints.minWidth,
-                        maxHeight = constraints.maxWidth
-                    )
-                )
-                layout(placeable.height, placeable.width) {
-                    placeable.place(x = -placeable.width, y = 0)
-                }
-            }
-    )
 }
