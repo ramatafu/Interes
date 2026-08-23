@@ -25,6 +25,15 @@ actual class DatabaseDriverFactory {
 
         if (isFreshDatabase) {
             InteresDatabase.Schema.create(driver)
+        } else {
+            // У пользователя уже есть база с прошлой версии приложения — в
+            // ней нет новой колонки deletedAt (добавлена для Корзины, см.
+            // Board.sq). В проекте не настроены версионные .sqm-миграции
+            // SQLDelight — ALTER TABLE тут самый простой надёжный способ
+            // довести старую БД до актуальной схемы. runCatching — при
+            // повторных запусках колонка уже будет на месте, и ALTER TABLE
+            // ожидаемо упадёт с "duplicate column name": это не ошибка.
+            runCatching { driver.execute(null, "ALTER TABLE Board ADD COLUMN deletedAt INTEGER;", 0) }
         }
         return driver
     }

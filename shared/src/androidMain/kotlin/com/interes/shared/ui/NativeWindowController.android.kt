@@ -9,4 +9,5 @@ actual class NativeWindowController {
     actual fun setOpacityPercent(percent: Int) {}
     actual fun moveWindowBy(dxPx: Float, dyPx: Float) {}
     actual fun toggleMaximize() {}
+    actual fun minimize() {}
 }

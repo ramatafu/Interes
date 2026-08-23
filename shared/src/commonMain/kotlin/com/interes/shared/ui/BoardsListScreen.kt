@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.IconButton
@@ -39,6 +40,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
@@ -64,13 +67,12 @@ fun BoardsListScreen(
     boards: List<BoardSummary>,
     repository: BoardRepository,
     onOpenBoard: (Long) -> Unit,
-    onOpenSettings: () -> Unit,
+    onCreateBoard: () -> Unit,
     nativeWindowController: NativeWindowController,
     onExitApp: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
 
-    var showCreateDialog by remember { mutableStateOf(false) }
     // Доска, для которой долгим нажатием (или кнопкой "⋮") вызвали меню действий.
     var actionsFor by remember { mutableStateOf<BoardSummary?>(null) }
     var renamingBoard by remember { mutableStateOf<BoardSummary?>(null) }
@@ -104,13 +106,14 @@ fun BoardsListScreen(
                             modifier = Modifier.fillMaxWidth()
                         )
                     } else {
-                        // windowDragHandle — тут, а не на всю TopAppBar: поле
-                        // поиска, кнопки лупы/шестерёнки/закрытия должны
-                        // оставаться кликабельными, а не пытаться таскать
-                        // окно при каждом клике по ним. Захватывать можно
-                        // только за сам текст заголовка — как за настоящую
-                        // title bar.
-                        Text("Interes", modifier = Modifier.windowDragHandle(nativeWindowController))
+                        // Раньше здесь был текст "Interes" — теперь название
+                        // приложения показывается в SideToolbar (см. там),
+                        // а тут остаётся просто пустая, но БОЛЬШАЯ (на всю
+                        // ширину заголовка, а не только по размеру текста)
+                        // перетаскиваемая область — так проще попасть по ней
+                        // мышью, чем раньше, когда область захвата была не
+                        // шире самого слова "Interes".
+                        Box(modifier = Modifier.fillMaxSize().windowDragHandle(nativeWindowController))
                     }
                 },
                 actions = {
@@ -129,18 +132,18 @@ fun BoardsListScreen(
                             style = MaterialTheme.typography.titleLarge
                         )
                     }
-                    // Настройки и закрытие приложения скрываем, пока открыто
-                    // поле поиска — иначе в узком окне тулбар начинает
-                    // теснить текстовое поле.
+                    // Кнопки управления окном скрываем, пока открыто поле
+                    // поиска — иначе в узком окне тулбар начинает теснить
+                    // текстовое поле.
                     if (!showSearchField) {
-                        IconButton(onClick = onOpenSettings) {
-                            Text("\u2699", style = MaterialTheme.typography.titleLarge)
+                        // Свернуть — замена системной кнопки "_", которой
+                        // больше нет у окна без рамки (undecorated, см.
+                        // Main.kt).
+                        IconButton(onClick = { nativeWindowController.minimize() }) {
+                            Text("\u2212", style = MaterialTheme.typography.titleLarge)
                         }
-                        // Замена системной кнопки "развернуть" — двойной
-                        // клик по заголовку тоже разворачивает (см.
-                        // windowDragHandle), эта кнопка — просто более
-                        // очевидная альтернатива для тех, кто не додумается
-                        // до двойного клика по надписи "Interes".
+                        // Развернуть/восстановить — замена системной кнопки
+                        // "квадратик".
                         IconButton(onClick = { nativeWindowController.toggleMaximize() }) {
                             Text("\u2750", style = MaterialTheme.typography.titleLarge)
                         }
@@ -159,8 +162,29 @@ fun BoardsListScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showCreateDialog = true }) {
+            // "Создать доску" теперь также есть в SideToolbar (см.
+            // AppRoot.kt) — тот же колбэк, чтобы диалог был один на оба
+            // источника, а не два независимых состояния.
+            FloatingActionButton(onClick = onCreateBoard) {
                 Text("+", style = MaterialTheme.typography.headlineSmall)
+            }
+        },
+        bottomBar = {
+            // Статистика — по ВСЕМ доскам, не только по видимым после
+            // поиска: это общая сводка по приложению, а не по результатам
+            // фильтра. BottomAppBar, а не просто Text с отступом снизу —
+            // тут же и фон/эффект приподнятости, бесплатно, без лишней
+            // разметки.
+            if (boards.isNotEmpty()) {
+                val totalPhotos = boards.sumOf { it.photoCount }
+                BottomAppBar {
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Text(
+                            "${boards.size} ${boardsWord(boards.size)} • $totalPhotos ${photosWord(totalPhotos)}",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
             }
         }
     ) { padding ->
@@ -180,11 +204,13 @@ fun BoardsListScreen(
             }
         } else {
             LazyVerticalGrid(
-                // Adaptive вместо Fixed(2): на телефоне это по факту даёт те
-                // же 2 колонки, но на широком окне Windows подбирает больше
-                // колонок под реальную ширину, а не оставляет половину окна
-                // пустой. minSize — минимальная ширина карточки.
-                columns = GridCells.Adaptive(minSize = 160.dp),
+                // AdaptiveMaxColumns (см. ниже в файле) — не GridCells.Adaptive
+                // напрямую и не GridCells.Fixed(8): на телефоне/узком окне
+                // должно быть меньше 8 колонок (иначе карточки станут
+                // нечитаемо мелкими), а на широком — вплоть до 8, но не больше
+                // (по ТЗ: "максимум 8 в строке"). minSize — минимальная
+                // ширина карточки, тот же смысл, что раньше был в Adaptive.
+                columns = AdaptiveMaxColumns(minSize = 160.dp, maxColumns = 8),
                 modifier = Modifier.fillMaxSize().padding(padding),
                 contentPadding = PaddingValues(8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -200,19 +226,6 @@ fun BoardsListScreen(
                 }
             }
         }
-    }
-
-    if (showCreateDialog) {
-        CreateBoardDialog(
-            onDismiss = { showCreateDialog = false },
-            onCreate = { title, category ->
-                showCreateDialog = false
-                scope.launch {
-                    val id = repository.createBoard(title, category)
-                    onOpenBoard(id)
-                }
-            }
-        )
     }
 
     // Меню "Переименовать / Удалить" — просто диалог с двумя пунктами вместо
@@ -256,10 +269,10 @@ fun BoardsListScreen(
         AlertDialog(
             onDismissRequest = { deletingBoard = null },
             title = { Text("Удалить доску?") },
-            text = { Text("Доска \"${board.title}\" и все фото на ней будут удалены безвозвратно.") },
+            text = { Text("Доска \"${board.title}\" переместится в Корзину. Оттуда её можно будет восстановить или удалить навсегда.") },
             confirmButton = {
                 TextButton(onClick = {
-                    scope.launch { repository.deleteBoard(board.id) }
+                    scope.launch { repository.softDeleteBoard(board.id) }
                     deletingBoard = null
                 }) { Text("Удалить", color = MaterialTheme.colorScheme.error) }
             },
@@ -306,6 +319,16 @@ private fun BoardCard(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
+        } else {
+            // Заглушка для пустой доски — без неё карточка выглядела бы как
+            // пустой серый прямоугольник, будто что-то не загрузилось.
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(
+                    "\uD83D\uDDBC",
+                    style = MaterialTheme.typography.displayMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                )
+            }
         }
 
         // Кнопка меню действий — видимая альтернатива долгому нажатию
@@ -351,8 +374,10 @@ private fun BoardCard(
     }
 }
 
+// Не private — используется и здесь (FAB), и из AppRoot.kt (кнопка
+// "Создать доску" в SideToolbar, видна поверх любого экрана).
 @Composable
-private fun CreateBoardDialog(
+fun CreateBoardDialog(
     onDismiss: () -> Unit,
     onCreate: (title: String, category: String) -> Unit
 ) {
@@ -422,3 +447,43 @@ private fun RenameBoardDialog(
         }
     )
 }
+
+/**
+ * Как GridCells.Adaptive, но с потолком в maxColumns: подбирает число
+ * колонок под реальную ширину экрана (минимум minSize на карточку), но
+ * никогда не превышает maxColumns, даже на очень широком окне.
+ * calculateCrossAxisCellSizes — официальный способ написать свою стратегию
+ * колонок для LazyVerticalGrid (тот же метод, который под капотом
+ * реализуют сами GridCells.Adaptive/GridCells.Fixed).
+ */
+private class AdaptiveMaxColumns(private val minSize: Dp, private val maxColumns: Int) : GridCells {
+    override fun Density.calculateCrossAxisCellSizes(availableSize: Int, spacing: Int): List<Int> {
+        val minSizePx = minSize.roundToPx()
+        val columns = ((availableSize + spacing).toFloat() / (minSizePx + spacing).toFloat())
+            .toInt()
+            .coerceIn(1, maxColumns)
+        val cellSize = (availableSize - spacing * (columns - 1)) / columns
+        // Остаток пикселей от целочисленного деления раздаём по одному
+        // первым колонкам — иначе между последней карточкой и правым краем
+        // мог бы оставаться заметный зазор в несколько пикселей.
+        val remainder = (availableSize - spacing * (columns - 1)) - cellSize * columns
+        return List(columns) { index -> if (index < remainder) cellSize + 1 else cellSize }
+    }
+}
+
+// "доска" склоняется по числам (1 доска, 2 доски, 5 досок) — обычные
+// русские правила для одушевлённых/неодушевлённых существительных на -а.
+private fun boardsWord(count: Int): String {
+    val mod100 = count % 100
+    val mod10 = count % 10
+    return when {
+        mod100 in 11..14 -> "досок"
+        mod10 == 1 -> "доска"
+        mod10 in 2..4 -> "доски"
+        else -> "досок"
+    }
+}
+
+// "фото" НЕ склоняется в русском (1 фото, 2 фото, 5 фото — одна форма
+// всегда) — функция только ради симметрии с boardsWord в месте вызова.
+private fun photosWord(count: Int): String = "фото"

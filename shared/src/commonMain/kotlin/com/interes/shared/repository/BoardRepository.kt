@@ -22,7 +22,14 @@ class BoardRepository(
         db.boardQueries.selectAllBoards()
             .asFlow()
             .mapToList(ioDispatcher)
-            .map { rows -> rows.map { Board(it.id, it.title, it.category, it.createdAt) } }
+            .map { rows -> rows.map { Board(it.id, it.title, it.category, it.createdAt, it.deletedAt) } }
+
+    /** Для экрана Корзины — доски с deletedAt != null, см. TrashScreen.kt. */
+    fun observeTrashedBoards(): Flow<List<Board>> =
+        db.boardQueries.selectTrashedBoards()
+            .asFlow()
+            .mapToList(ioDispatcher)
+            .map { rows -> rows.map { Board(it.id, it.title, it.category, it.createdAt, it.deletedAt) } }
 
     /** Для экрана списка досок: доска + путь к первому фото как превью. */
     fun observeBoardSummaries(): Flow<List<BoardSummary>> =
@@ -51,12 +58,26 @@ class BoardRepository(
     }
 
     /**
-     * Удаляет доску вместе со всеми её фото (ON DELETE CASCADE в схеме
-     * Photo — при включённом PRAGMA foreign_keys, см. DatabaseDriverFactory).
-     * Файлы фото на диске тоже нужно почистить отдельно — каскад в БД
-     * удаляет только строки, не сами файлы.
+     * Обычное удаление доски из списка ("⋮ → Удалить") — теперь МЯГКОЕ:
+     * доска не стирается, а помечается deletedAt и переезжает в Корзину
+     * (см. TrashScreen.kt). Файлы фото на диске НЕ трогаются здесь —
+     * это только у permanentlyDeleteBoard ниже.
      */
-    suspend fun deleteBoard(boardId: Long) = withContext(ioDispatcher) {
+    suspend fun softDeleteBoard(boardId: Long) = withContext(ioDispatcher) {
+        db.boardQueries.softDeleteBoard(currentTimeMillis(), boardId)
+    }
+
+    /** Возвращает доску из Корзины обратно в общий список. */
+    suspend fun restoreBoard(boardId: Long) = withContext(ioDispatcher) {
+        db.boardQueries.restoreBoard(boardId)
+    }
+
+    /**
+     * Настоящее, безвозвратное удаление — строка из БД И файлы фото с
+     * диска. Вызывается ТОЛЬКО из Корзины ("Удалить навсегда"). Обычное
+     * удаление из списка досок — softDeleteBoard выше.
+     */
+    suspend fun permanentlyDeleteBoard(boardId: Long) = withContext(ioDispatcher) {
         val photos = db.photoQueries.selectPhotosByBoard(boardId).executeAsList()
         db.boardQueries.deleteBoard(boardId)
         photos.forEach { photoFileStorage.deletePhotoFile(it.filePath) }

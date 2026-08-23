@@ -53,6 +53,11 @@ kotlin {
                 // Сетевой модуль (coil-network-*) намеренно не подключаем —
                 // приложение офлайн, грузим только локальные file:// пути.
                 implementation(libs.coil.compose)
+
+                // Шрифт Inter (см. AppTheme.kt) — грузится из
+                // commonMain/composeResources/font/ через сгенерированный
+                // Res-класс, для этого нужна именно эта зависимость.
+                implementation(compose.components.resources)
             }
         }
         val androidMain by getting {
@@ -78,4 +83,12 @@ sqldelight {
             packageName.set("com.interes.shared.db")
         }
     }
+}
+
+compose.resources {
+    // Явно задаём имя пакета для сгенерированного Res (шрифт Inter, см.
+    // AppTheme.kt) — чтобы не зависеть от автоопределения по умолчанию и
+    // держать его в одном стиле с остальными пакетами проекта
+    // (com.interes.shared.*).
+    packageOfResClass = "com.interes.shared.generated.resources"
 }

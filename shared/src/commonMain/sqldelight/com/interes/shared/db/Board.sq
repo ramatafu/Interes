@@ -2,23 +2,40 @@ CREATE TABLE Board (
     id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
     category TEXT NOT NULL,
-    createdAt INTEGER NOT NULL
+    createdAt INTEGER NOT NULL,
+    -- NULL = доска активна. Не NULL = "удалена" — на самом деле лежит в
+    -- Корзине (см. TrashScreen.kt), ждёт восстановления или окончательного
+    -- удаления. Все обычные запросы (список досок, поиск и т.д.) её не
+    -- видят — фильтруются по deletedAt IS NULL ниже.
+    deletedAt INTEGER
 );
 
 selectAllBoards:
-SELECT * FROM Board ORDER BY createdAt DESC;
+SELECT * FROM Board WHERE deletedAt IS NULL ORDER BY createdAt DESC;
 
 selectBoardById:
 SELECT * FROM Board WHERE id = ?;
 
 selectBoardsByCategory:
-SELECT * FROM Board WHERE category = ? ORDER BY createdAt DESC;
+SELECT * FROM Board WHERE category = ? AND deletedAt IS NULL ORDER BY createdAt DESC;
+
+selectTrashedBoards:
+SELECT * FROM Board WHERE deletedAt IS NOT NULL ORDER BY deletedAt DESC;
 
 insertBoard:
 INSERT INTO Board (title, category, createdAt) VALUES (?, ?, ?);
 
+-- Настоящее удаление строки — теперь используется только из Корзины
+-- ("Удалить навсегда", см. BoardRepository.permanentlyDeleteBoard). Обычное
+-- удаление из списка досок — softDeleteBoard ниже.
 deleteBoard:
 DELETE FROM Board WHERE id = ?;
+
+softDeleteBoard:
+UPDATE Board SET deletedAt = ? WHERE id = ?;
+
+restoreBoard:
+UPDATE Board SET deletedAt = NULL WHERE id = ?;
 
 updateBoardTitle:
 UPDATE Board SET title = ? WHERE id = ?;
@@ -33,6 +50,7 @@ SELECT Board.id, Board.title, Board.category, Board.createdAt, Photo.filePath AS
 FROM Board
 LEFT JOIN Photo ON Photo.boardId = Board.id
     AND Photo.orderIndex = (SELECT MIN(p2.orderIndex) FROM Photo p2 WHERE p2.boardId = Board.id)
+WHERE Board.deletedAt IS NULL
 ORDER BY Board.createdAt DESC;
 
 lastInsertRowId:

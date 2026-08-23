@@ -12,6 +12,13 @@ actual class DatabaseDriverFactory(private val context: Context) {
         // включить — без этого удаление доски НЕ удалит её фото каскадно,
         // несмотря на "ON DELETE CASCADE" в схеме Photo.sq.
         driver.execute(null, "PRAGMA foreign_keys=ON;", 0)
+        // См. подробный комментарий в DatabaseDriverFactory.desktop.kt — та
+        // же защитная миграция для БД, оставшихся от версии приложения до
+        // Корзины (deletedAt). AndroidSqliteDriver(Schema, ...) сам создаёт
+        // свежую БД по актуальной схеме на первом запуске — ALTER TABLE тут
+        // нужен только существующим установкам; runCatching — на повторных
+        // запусках колонка уже на месте, и это ожидаемо упадёт.
+        runCatching { driver.execute(null, "ALTER TABLE Board ADD COLUMN deletedAt INTEGER;", 0) }
         return driver
     }
 }
