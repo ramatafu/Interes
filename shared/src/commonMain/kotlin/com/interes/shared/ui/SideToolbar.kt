@@ -28,35 +28,21 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.interes.shared.storage.BackupPaths
 
-// Ширина панели — используется и здесь, и в AppRoot.kt (там нужен тот же
-// отступ слева у контента, чтобы не уезжать под панель — см.
-// Modifier.padding(start = ToolbarWidth) в AppRoot.kt). Цвет фона панели —
-// AppPrimaryColor из AppTheme.kt (тот же фирменный #0088CC, что и во всей
-// остальной цветовой схеме приложения, не отдельная константа).
 val ToolbarWidth: Dp = 72.dp
 
-/**
- * Постоянная левая панель инструментов — заменила собой весь экран
- * "Настройки" (см. AppRoot.kt). Видна поверх любого содержимого приложения:
- * список досок, открытая доска, просмотрщик фото, Корзина — везде.
- *
- * Без material-icons-extended (та же причина, что и везде в проекте —
- * см. комментарии в BoardsListScreen.kt/BoardScreen.kt): иконки — обычные
- * Unicode-символы текстом, а не векторная графика.
- */
 @Composable
 fun SideToolbar(
     modifier: Modifier = Modifier,
     onHome: () -> Unit,
     onCreateBoard: () -> Unit,
     backupPaths: BackupPaths,
-    onOpenTrash: () -> Unit
+    onOpenTrash: () -> Unit,
+    // Стрелка "предыдущее фото" — видна только когда можно листнуть влево.
+    // null = стрелка не показывается (не открыт просмотрщик или первая страница).
+    onPrevPhoto: (() -> Unit)? = null
 ) {
     var backupMenuExpanded by remember { mutableStateOf(false) }
     var showInfoDialog by remember { mutableStateOf(false) }
-    // Результат последней операции с резервной копией — показываем простым
-    // диалогом (не Snackbar: у узкой боковой панели нет своего Scaffold,
-    // заводить его тут ради одного сообщения — лишнее усложнение).
     var backupResultMessage by remember { mutableStateOf<String?>(null) }
     var backupResultIsError by remember { mutableStateOf(false) }
 
@@ -81,21 +67,9 @@ fun SideToolbar(
             .background(AppPrimaryColor)
             .padding(vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        // Arrangement.SpaceBetween вместо Modifier.weight(1f) на спейсере —
-        // .weight() (Row/ColumnScope) в этом проекте ловит старый конфликт
-        // версий Compose-foundation (та же причина, что и в AppRoot.kt, см.
-        // комментарий там). SpaceBetween распределяет свободное место МЕЖДУ
-        // двумя дочерними Column (верхняя группа кнопок / нижняя с Корзиной),
-        // не используя weight вообще — и даёт ровно тот же визуальный
-        // результат: верхняя группа прижата к верху, Корзина — к низу.
         verticalArrangement = Arrangement.SpaceBetween
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            // Название приложения — раньше было в заголовке списка досок,
-            // перенесено сюда по просьбе (панель видна всегда, а не только
-            // на одном экране). Без maxLines/fontSize-подгонки: при 72dp
-            // ширины и стандартном labelSmall слово "Interes" переносится
-            // на 2 строки само — это ожидаемо и нормально выглядит.
             Text(
                 "Interes",
                 color = Color.White,
@@ -129,6 +103,12 @@ fun SideToolbar(
             ToolbarIconButton(symbol = "\u2139", contentDescription = "О программе", onClick = { showInfoDialog = true })
         }
 
+        // Стрелка "предыдущее фото" — появляется здесь когда открыт просмотрщик
+        // и есть предыдущее фото. Нарисована на тулбаре = никогда не прозрачнеет.
+        if (onPrevPhoto != null) {
+            ToolbarIconButton(symbol = "\u25C0", contentDescription = "Предыдущее фото", onClick = onPrevPhoto)
+        }
+
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             HorizontalDivider(color = Color.White.copy(alpha = 0.3f), modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
             ToolbarIconButton(symbol = "\uD83D\uDDD1", contentDescription = "Корзина", onClick = onOpenTrash)
@@ -141,9 +121,6 @@ fun SideToolbar(
             title = { Text("Interes") },
             text = {
                 Column {
-                    // ВАЖНО: версия захардкожена и должна вручную совпадать
-                    // с packageVersion в desktopApp/build.gradle.kts —
-                    // единого источника версии на весь проект сейчас нет.
                     Text("Версия 0.1.0", style = MaterialTheme.typography.bodyMedium)
                     Text(
                         "Приложение для досок визуализации: собирайте и организуйте фотографии по темам и категориям.",
@@ -151,26 +128,9 @@ fun SideToolbar(
                         modifier = Modifier.padding(top = 8.dp)
                     )
                     Text(
-                        // Стандартное короткое уведомление о GPLv3 (то, что
-                        // FSF рекомендует показывать в диалогах "О
-                        // программе") — не полный текст лицензии на
-                        // несколько тысяч слов, для него на это отдельная
-                        // ссылка ниже.
-                        "Лицензия: GNU General Public License v3.0 (GPLv3). " +
-                            "Это свободное ПО: вы можете распространять и/или изменять его на " +
-                            "условиях GPLv3. Полный текст лицензии: " +
-                            "https://www.gnu.org/licenses/gpl-3.0.html",
+                        "Лицензия: GNU General Public License v3.0 (GPLv3).",
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(top = 8.dp)
-                    )
-                    Text(
-                        // Просто текст, не кликабельная ссылка — открытие
-                        // браузера по клику потребовало бы ещё один
-                        // expect/actual только ради этого; текст можно
-                        // скопировать вручную.
-                        "GitHub: https://github.com/ramatafu/Interes",
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 4.dp)
                     )
                 }
             },

@@ -23,16 +23,6 @@ import com.interes.shared.repository.BoardRepository
 import com.interes.shared.storage.BackupPaths
 import kotlinx.coroutines.launch
 
-/**
- * Мостик для клавиатуры: Main.kt (desktop) ловит ← / → на уровне окна и
- * вызывает эти лямбды. Пока просмотрщик закрыт — они null, стрелки ничего
- * не делают. На Android просто никто их не дёргает — безопасно.
- */
-object ViewerKeys {
-    var onLeft: (() -> Unit)? = null
-    var onRight: (() -> Unit)? = null
-}
-
 @Composable
 fun InteresRoot(
     repository: BoardRepository,
@@ -59,14 +49,6 @@ fun InteresRoot(
         if (viewerState == null) appOpacityPercent = 100f
     }
 
-    // Просмотрщик закрыт — отключаем клавиатурные стрелки.
-    LaunchedEffect(viewerState) {
-        if (viewerState == null) {
-            ViewerKeys.onLeft = null
-            ViewerKeys.onRight = null
-        }
-    }
-
     PlatformBackHandler(enabled = showTrash) { showTrash = false }
     PlatformBackHandler(enabled = !showTrash && viewerState != null) { viewerState = null }
     PlatformBackHandler(enabled = !showTrash && viewerState == null && selectedBoardId != null) { selectedBoardId = null }
@@ -79,38 +61,22 @@ fun InteresRoot(
 
     InteresTheme {
         Box(modifier = Modifier.fillMaxSize()) {
+            // Поднимаем pagerState сюда, чтобы он был доступен и внутри
+            // контента, и при создании лямбд для тулбаров ниже.
+            val currentViewerState = viewerState
+            val pagerState = if (currentViewerState != null) {
+                rememberPagerState(initialPage = currentViewerState.second) { currentViewerState.first.size }
+            } else null
+
+            if (pagerState != null) {
+                LaunchedEffect(pagerState.currentPage) { appOpacityPercent = 100f }
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(start = ToolbarWidth, end = RightToolbarWidth)
             ) {
-                val currentViewerState = viewerState
-                val pagerState = if (currentViewerState != null) {
-                    rememberPagerState(initialPage = currentViewerState.second) { currentViewerState.first.size }
-                } else null
-
-                if (pagerState != null) {
-                    LaunchedEffect(pagerState.currentPage) { appOpacityPercent = 100f }
-
-                    // Подключаем клавиатурные стрелки к пейджеру, пока он открыт.
-                    LaunchedEffect(pagerState) {
-                        ViewerKeys.onLeft = {
-                            scope.launch {
-                                pagerState.animateScrollToPage(
-                                    (pagerState.currentPage - 1).coerceAtLeast(0)
-                                )
-                            }
-                        }
-                        ViewerKeys.onRight = {
-                            scope.launch {
-                                pagerState.animateScrollToPage(
-                                    (pagerState.currentPage + 1).coerceAtMost(pagerState.pageCount - 1)
-                                )
-                            }
-                        }
-                    }
-                }
-
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -170,35 +136,47 @@ fun InteresRoot(
                         currentPage = pagerState.currentPage,
                         opacityPercent = appOpacityPercent,
                         onOpacityChange = { appOpacityPercent = it },
-                        onDismiss = { viewerState = null },
-                        onPreviousPage = {
-                            scope.launch {
-                                pagerState.animateScrollToPage(
-                                    (pagerState.currentPage - 1).coerceAtLeast(0)
-                                )
-                            }
-                        },
-                        onNextPage = {
-                            scope.launch {
-                                pagerState.animateScrollToPage(
-                                    (pagerState.currentPage + 1).coerceAtMost(pagerState.pageCount - 1)
-                                )
-                            }
-                        }
+                        onDismiss = { viewerState = null }
                     )
                 }
             }
 
+            // Лямбды пролистывания — null когда просмотрщик закрыт или нельзя
+            // листнуть в эту сторону; тогда стрелка на тулбаре не рисуется.
+            val onPrevPhoto: (() -> Unit)? = if (pagerState != null && pagerState.currentPage > 0) {
+                {
+                    scope.launch {
+                        pagerState.animateScrollToPage(
+                            (pagerState.currentPage - 1).coerceAtLeast(0)
+                        )
+                    }
+                }
+            } else null
+
+            val onNextPhoto: (() -> Unit)? = if (pagerState != null && pagerState.currentPage < pagerState.pageCount - 1) {
+                {
+                    scope.launch {
+                        pagerState.animateScrollToPage(
+                            (pagerState.currentPage + 1).coerceAtMost(pagerState.pageCount - 1)
+                        )
+                    }
+                }
+            } else null
+
+            // Левый тулбар со стрелкой ◀ (когда можно листнуть влево).
             SideToolbar(
                 modifier = Modifier.fillMaxHeight().align(Alignment.CenterStart),
                 onHome = goHome,
                 onCreateBoard = { showCreateBoardDialog = true },
                 backupPaths = backupPaths,
-                onOpenTrash = { showTrash = true }
+                onOpenTrash = { showTrash = true },
+                onPrevPhoto = onPrevPhoto
             )
 
+            // Правый тулбар со стрелкой ▶ (когда можно листнуть вправо).
             RightToolbar(
-                modifier = Modifier.fillMaxHeight().align(Alignment.CenterEnd)
+                modifier = Modifier.fillMaxHeight().align(Alignment.CenterEnd),
+                onNextPhoto = onNextPhoto
             )
         }
 

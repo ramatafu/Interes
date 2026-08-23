@@ -27,8 +27,6 @@ fun PhotoViewerControls(
     opacityPercent: Float,
     onOpacityChange: (Float) -> Unit,
     onDismiss: () -> Unit,
-    onPreviousPage: () -> Unit,
-    onNextPage: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier) {
@@ -79,34 +77,6 @@ fun PhotoViewerControls(
             contentAlignment = Alignment.Center
         ) {
             Text("\u2715", color = Color.White, fontSize = 20.sp)
-        }
-
-        // Стрелка "предыдущее" — СЛЕВА от фотографии, по центру высоты.
-        if (currentPage > 0) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(12.dp)
-                    .size(56.dp)
-                    .clickable(onClick = onPreviousPage),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("\u25C0", color = Color.White.copy(alpha = 0.6f), fontSize = 40.sp)
-            }
-        }
-
-        // Стрелка "следующее" — СПРАВА от фотографии, по центру высоты.
-        if (currentPage < pageCount - 1) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(12.dp)
-                    .size(56.dp)
-                    .clickable(onClick = onNextPage),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("\u25B6", color = Color.White.copy(alpha = 0.6f), fontSize = 40.sp)
-            }
         }
     }
 }
