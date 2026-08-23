@@ -55,6 +55,7 @@ import coil3.request.crossfade
 import coil3.size.Size
 import com.interes.shared.generated.resources.Res
 import com.interes.shared.generated.resources.app_icon
+import com.interes.shared.generated.resources.board_placeholder
 import com.interes.shared.model.BoardSummary
 import com.interes.shared.repository.BoardRepository
 import com.interes.shared.util.localFilePathToUri
@@ -133,20 +134,31 @@ fun BoardsListScreen(
                     .background(SideToolbarColor)
                     .windowDragHandle(nativeWindowController)
             ) {
-                // Иконка приложения — слева, поверх перетаскиваемой области.
-                // Скрыта в режиме поиска: там на этом месте разворачивается
-                // на всю ширину поле поиска (см. ветку showSearchField ниже).
+                // Значок + название приложения — слева, на той же
+                // горизонтальной линии, что и лупа/кнопки окна справа (обе
+                // группы — Row с fillMaxHeight + CenterVertically). Скрыто в
+                // режиме поиска — там на этом месте разворачивается поле
+                // поиска (см. ветку showSearchField ниже).
                 if (!showSearchField) {
-                    Image(
-                        painter = painterResource(Res.drawable.app_icon),
-                        contentDescription = null,
+                    Row(
                         modifier = Modifier
                             .align(Alignment.CenterStart)
-                            .padding(start = 16.dp)
-                            .size(28.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                    )
+                            .fillMaxHeight()
+                            .padding(start = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Image(
+                            painter = painterResource(Res.drawable.app_icon),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Interes", style = MaterialTheme.typography.titleMedium)
+                    }
                 }
+
                 if (showSearchField) {
                     // Режим поиска: строка поиска досок + крестик закрытия.
                     OutlinedTextField(
@@ -178,7 +190,7 @@ fun BoardsListScreen(
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .fillMaxHeight()
-                            .padding(end = 8.dp),
+                            .padding(end = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Лупа — при нажатии появляется строка поиска досок.
@@ -383,15 +395,14 @@ private fun BoardCard(
                 modifier = Modifier.fillMaxSize()
             )
         } else {
-            // Заглушка для пустой доски — без неё карточка выглядела бы как
-            // пустой серый прямоугольник, будто что-то не загрузилось.
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(
-                    "\uD83D\uDDBC",
-                    style = MaterialTheme.typography.displayMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                )
-            }
+            // Заглушка для пустой доски — вместо эмодзи-рамки теперь
+            // картинка-заглушка (см. board_placeholder.png).
+            Image(
+                painter = painterResource(Res.drawable.board_placeholder),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
         }
 
         // Кнопка меню действий — видимая альтернатива долгому нажатию

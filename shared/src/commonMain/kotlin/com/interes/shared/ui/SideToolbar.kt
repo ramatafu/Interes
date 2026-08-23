@@ -80,13 +80,6 @@ fun SideToolbar(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(15.dp)
         ) {
-            Text(
-                "Interes",
-                color = Color.White,
-                style = MaterialTheme.typography.labelSmall,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
             ToolbarIconButton(symbol = "\u2302", contentDescription = "Домой", onClick = onHome)
             ToolbarIconButton(symbol = "+", contentDescription = "Создать доску", onClick = onCreateBoard)
 

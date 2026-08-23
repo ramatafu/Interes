@@ -50,6 +50,9 @@ fun TrashScreen(
     var confirmingDeleteBoard by remember { mutableStateOf<Board?>(null) }
 
     Scaffold(
+        // Фон экрана целиком (позади списка удалённых досок) — тот же
+        // цвет, что и у тулбаров: 92B1B7.
+        containerColor = SideToolbarColor,
         topBar = {
             TopAppBar(
                 modifier = Modifier.height(TopToolbarHeight),
