@@ -26,6 +26,15 @@ actual class NativeWindowController(private val window: ComposeWindow) {
         runCatching { window.opacity = (percent / 100f).coerceIn(0f, 1f) }
     }
 
+    actual fun getWindowPosition(): Pair<Int, Int> {
+        val loc = window.location
+        return loc.x to loc.y
+    }
+
+    actual fun setWindowPosition(x: Int, y: Int) {
+        window.setLocation(x, y)
+    }
+
     actual fun moveWindowBy(dxPx: Float, dyPx: Float) {
         val loc = window.location
         window.setLocation(

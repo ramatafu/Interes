@@ -7,6 +7,8 @@ actual class NativeWindowController {
     // системного API окна для этого не нужно, класс-заглушка.
     actual val handlesOpacityNatively: Boolean = false
     actual fun setOpacityPercent(percent: Int) {}
+    actual fun getWindowPosition(): Pair<Int, Int> = 0 to 0
+    actual fun setWindowPosition(x: Int, y: Int) {}
     actual fun moveWindowBy(dxPx: Float, dyPx: Float) {}
     actual fun toggleMaximize() {}
     actual fun minimize() {}

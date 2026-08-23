@@ -1,17 +1,22 @@
 package com.interes.shared.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -27,7 +32,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,6 +57,11 @@ import com.interes.shared.repository.BoardRepository
 import com.interes.shared.util.localFilePathToUri
 import kotlinx.coroutines.launch
 
+// Высота верхнего тулбара — фиксированная, чтобы панель НЕ растягивалась
+// на всё окно (старый TopAppBar с Box(fillMaxSize()) в title именно этим
+// и болел: кнопки уезжали в середину окна).
+private val TopToolbarHeight: Dp = 56.dp
+
 /**
  * Стартовый экран: карточки всех досок. Долгое нажатие на карточку ИЛИ
  * кнопка "⋮" в её углу открывает меню "Переименовать / Удалить" (кнопка —
@@ -60,6 +69,12 @@ import kotlinx.coroutines.launch
  * пропустить; с ней действие остаётся доступным и по клику). Кнопка "+"
  * создаёт новую доску и сразу в неё переходит. Поле поиска в тулбаре
  * фильтрует доски по названию и категории на лету, без запроса к БД.
+ *
+ * Верхний тулбар — самописная панель фиксированной высоты (НЕ TopAppBar):
+ * слева — пустая перетаскиваемая область (зажатие мышью двигает окно),
+ * справа — лупа, затем ровно 60 dp, затем "Свернуть / Развернуть / Закрыть".
+ * Кнопки — компактные глифы без внутренних отступов IconButton, поэтому
+ * расстояние между лупой и "Свернуть" — честно 60 dp, а не 60 + паддинги.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,71 +110,74 @@ fun BoardsListScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    if (showSearchField) {
-                        OutlinedTextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it },
-                            placeholder = { Text("Поиск досок") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    } else {
-                        // Раньше здесь был текст "Interes" — теперь название
-                        // приложения показывается в SideToolbar (см. там),
-                        // а тут остаётся просто пустая, но БОЛЬШАЯ (на всю
-                        // ширину заголовка, а не только по размеру текста)
-                        // перетаскиваемая область — так проще попасть по ней
-                        // мышью, чем раньше, когда область захвата была не
-                        // шире самого слова "Interes".
-                        Box(modifier = Modifier.fillMaxSize().windowDragHandle(nativeWindowController))
+            // Вся панель — одна перетаскиваемая область: зажатие мышью в
+            // любом свободном месте двигает окно (windowDragHandle). Кнопки
+            // и поле поиска сами глотают свои нажатия, поэтому драг им не
+            // мешает.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(TopToolbarHeight)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .windowDragHandle(nativeWindowController)
+            ) {
+                if (showSearchField) {
+                    // Режим поиска: строка поиска досок + крестик закрытия.
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("Поиск досок") },
+                        singleLine = true,
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .fillMaxWidth()
+                            .padding(start = 8.dp, end = 48.dp)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .size(40.dp)
+                            .clickable {
+                                showSearchField = false
+                                searchQuery = ""
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("\u2715", style = MaterialTheme.typography.titleLarge)
                     }
-                },
-                actions = {
-                    IconButton(onClick = {
-                        if (showSearchField) {
-                            showSearchField = false
-                            searchQuery = ""
-                        } else {
-                            showSearchField = true
-                        }
-                    }) {
-                        // Без material-icons-extended — лупа/крестик текстом,
-                        // тем же приёмом, что стрелка "назад" в BoardScreen.
-                        Text(
-                            if (showSearchField) "\u2715" else "\uD83D\uDD0D",
-                            style = MaterialTheme.typography.titleLarge
-                        )
-                    }
-                    // Кнопки управления окном скрываем, пока открыто поле
-                    // поиска — иначе в узком окне тулбар начинает теснить
-                    // текстовое поле.
-                    if (!showSearchField) {
+                } else {
+                    // Группа кнопок справа: лупа, ровно 60 dp, затем
+                    // "Свернуть / Развернуть / Закрыть".
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .fillMaxHeight()
+                            .padding(end = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Лупа — при нажатии появляется строка поиска досок.
+                        TopBarGlyph(symbol = "\uD83D\uDD0D") { showSearchField = true }
+
+                        // Ровно 60 dp между лупой и кнопкой "Свернуть" — по ТЗ.
+                        // Кнопки — глифы без внутренних отступов, поэтому
+                        // расстояние честное, не раздутое паддингами.
+                        Spacer(modifier = Modifier.width(60.dp))
+
                         // Свернуть — замена системной кнопки "_", которой
-                        // больше нет у окна без рамки (undecorated, см.
-                        // Main.kt).
-                        IconButton(onClick = { nativeWindowController.minimize() }) {
-                            Text("\u2212", style = MaterialTheme.typography.titleLarge)
-                        }
+                        // больше нет у окна без рамки (undecorated, см. Main.kt).
+                        TopBarGlyph(symbol = "\u2212") { nativeWindowController.minimize() }
+                        Spacer(modifier = Modifier.width(12.dp))
                         // Развернуть/восстановить — замена системной кнопки
                         // "квадратик".
-                        IconButton(onClick = { nativeWindowController.toggleMaximize() }) {
-                            Text("\u2750", style = MaterialTheme.typography.titleLarge)
-                        }
-                        // Единственный способ закрыть приложение из UI теперь,
-                        // когда у окна нет системной рамки (undecorated,
-                        // см. Main.kt) — раньше был системный крестик в углу
-                        // окна. Alt+F4 по-прежнему тоже работает (это
-                        // системный шорткат ОС, не завязанный на видимую
-                        // title bar), но кнопка в интерфейсе нужна для тех,
+                        TopBarGlyph(symbol = "\u2750") { nativeWindowController.toggleMaximize() }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        // Закрыть. Alt+F4 по-прежнему тоже работает (системный
+                        // шорткат ОС), но кнопка в интерфейсе нужна для тех,
                         // кто про Alt+F4 не вспомнит.
-                        IconButton(onClick = onExitApp) {
-                            Text("\u2715", style = MaterialTheme.typography.titleLarge)
-                        }
+                        TopBarGlyph(symbol = "\u2715") { onExitApp() }
                     }
                 }
-            )
+            }
         },
         floatingActionButton = {
             // "Создать доску" теперь также есть в SideToolbar (см.
@@ -280,6 +298,25 @@ fun BoardsListScreen(
                 TextButton(onClick = { deletingBoard = null }) { Text("Отмена") }
             }
         )
+    }
+}
+
+/**
+ * Компактная кнопка верхнего тулбара: размер по глифу + фиксированная
+ * высота 40 dp, БЕЗ внутренних горизонтальных отступов (в отличие от
+ * IconButton, который добавляет ~12 dp с каждой стороны и раздувает
+ * расстояния между иконками). Ширина по содержимому — поэтому Spacer(60.dp)
+ * рядом даёт честные 60 dp между лупой и "Свернуть".
+ */
+@Composable
+private fun TopBarGlyph(symbol: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .height(40.dp)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(symbol, style = MaterialTheme.typography.titleLarge)
     }
 }
 
