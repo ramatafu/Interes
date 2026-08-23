@@ -1,10 +1,12 @@
 package com.interes.shared.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -61,21 +63,22 @@ fun SideToolbar(
         )
     }
 
-    // Box вместо Column: верхняя группа прижата к верху, нижняя — к низу,
-    // а стрелка ◀ стоит ТОЧНО по центру высоты. Правый тулбар использует ту
-    // же схему — поэтому его стрелка ▶ оказывается на том же уровне.
     Box(
         modifier = modifier
             .width(ToolbarWidth)
             .fillMaxHeight()
             .background(AppPrimaryColor)
     ) {
+        // Верхняя группа — опущена на 110 dp от верха,
+        // расстояние между кнопками +15 dp (spacedBy(15.dp)).
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
+                .offset(y = 110.dp)
                 .padding(top = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(15.dp)
         ) {
             Text(
                 "Interes",
@@ -127,6 +130,7 @@ fun SideToolbar(
             }
         }
 
+        // Нижняя группа — прижата к низу.
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -176,13 +180,17 @@ fun SideToolbar(
     }
 }
 
+/**
+ * Кнопка левой панели — КРУПНЕЕ, чем раньше: 64 dp вместо 48 dp
+ * и шрифт headlineLarge вместо headlineSmall.
+ */
 @Composable
 private fun ToolbarIconButton(symbol: String, contentDescription: String, onClick: () -> Unit) {
-    IconButton(onClick = onClick, modifier = Modifier.size(48.dp).padding(vertical = 2.dp)) {
+    IconButton(onClick = onClick, modifier = Modifier.size(64.dp).padding(vertical = 2.dp)) {
         Text(
             symbol,
             color = Color.White,
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.headlineLarge,
             textAlign = TextAlign.Center
         )
     }
