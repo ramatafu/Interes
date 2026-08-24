@@ -63,12 +63,7 @@ fun RightToolbar(
                     .align(Alignment.Center)
                     .size(64.dp)
             ) {
-                Text(
-                    "\u25B6",
-                    color = Color.White,
-                    style = MaterialTheme.typography.headlineLarge,
-                    textAlign = TextAlign.Center
-                )
+                ChevronRightGlyph()
             }
         }
 

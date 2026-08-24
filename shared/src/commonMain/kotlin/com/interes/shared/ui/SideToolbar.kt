@@ -26,7 +26,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.interes.shared.storage.BackupPaths
@@ -80,11 +79,11 @@ fun SideToolbar(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(15.dp)
         ) {
-            ToolbarIconButton(symbol = "\u2302", contentDescription = "Домой", onClick = onHome)
-            ToolbarIconButton(symbol = "+", contentDescription = "Создать доску", onClick = onCreateBoard)
+            ToolbarIconButton(contentDescription = "Домой", onClick = onHome) { HomeGlyph() }
+            ToolbarIconButton(contentDescription = "Создать доску", onClick = onCreateBoard) { PlusGlyph() }
 
             Box {
-                ToolbarIconButton(symbol = "\uD83D\uDCBE", contentDescription = "Резервная копия", onClick = { backupMenuExpanded = true })
+                ToolbarIconButton(contentDescription = "Резервная копия", onClick = { backupMenuExpanded = true }) { BackupGlyph() }
                 DropdownMenu(expanded = backupMenuExpanded, onDismissRequest = { backupMenuExpanded = false }) {
                     DropdownMenuItem(
                         text = { Text("Создать резервную копию") },
@@ -103,7 +102,7 @@ fun SideToolbar(
                 }
             }
 
-            ToolbarIconButton(symbol = "\u2139", contentDescription = "О программе", onClick = { showInfoDialog = true })
+            ToolbarIconButton(contentDescription = "О программе", onClick = { showInfoDialog = true }) { InfoGlyph() }
         }
 
         // Стрелка "предыдущее фото" — ТОЧНО по центру высоты окна.
@@ -114,12 +113,7 @@ fun SideToolbar(
                     .align(Alignment.Center)
                     .size(48.dp)
             ) {
-                Text(
-                    "\u25C0",
-                    color = Color.White,
-                    style = MaterialTheme.typography.headlineSmall,
-                    textAlign = TextAlign.Center
-                )
+                ChevronLeftGlyph()
             }
         }
 
@@ -132,7 +126,7 @@ fun SideToolbar(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             HorizontalDivider(color = Color.White.copy(alpha = 0.3f), modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
-            ToolbarIconButton(symbol = "\uD83D\uDDD1", contentDescription = "Корзина", onClick = onOpenTrash)
+            ToolbarIconButton(contentDescription = "Корзина", onClick = onOpenTrash) { TrashGlyph() }
         }
     }
 
@@ -178,13 +172,8 @@ fun SideToolbar(
  * и шрифт headlineLarge вместо headlineSmall.
  */
 @Composable
-private fun ToolbarIconButton(symbol: String, contentDescription: String, onClick: () -> Unit) {
+private fun ToolbarIconButton(contentDescription: String, onClick: () -> Unit, content: @Composable () -> Unit) {
     IconButton(onClick = onClick, modifier = Modifier.size(64.dp).padding(vertical = 2.dp)) {
-        Text(
-            symbol,
-            color = Color.White,
-            style = MaterialTheme.typography.headlineLarge,
-            textAlign = TextAlign.Center
-        )
+        content()
     }
 }
