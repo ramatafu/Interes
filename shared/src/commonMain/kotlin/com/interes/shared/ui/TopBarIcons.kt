@@ -1,8 +1,11 @@
 package com.interes.shared.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -274,5 +277,27 @@ fun TrashGlyph(
         // Рёбра внутри.
         drawLine(color = color, start = Offset(w * 0.4f, lidY + h * 0.08f), end = Offset(w * 0.41f, h * 0.86f), strokeWidth = stroke * 0.8f, cap = StrokeCap.Round)
         drawLine(color = color, start = Offset(w * 0.6f, lidY + h * 0.08f), end = Offset(w * 0.59f, h * 0.86f), strokeWidth = stroke * 0.8f, cap = StrokeCap.Round)
+    }
+}
+
+/**
+ * Компактная кнопка верхнего тулбара: размер по глифу + фиксированная
+ * высота 40 dp, БЕЗ внутренних горизонтальных отступов (в отличие от
+ * IconButton, который добавляет ~12 dp с каждой стороны и раздувает
+ * расстояния между иконками). Ширина по содержимому — поэтому Spacer(60.dp)
+ * рядом даёт честные 60 dp между лупой и "Свернуть". Используется из
+ * AppRoot.kt (верхняя панель главного экрана рисуется там целиком, чтобы
+ * по-настоящему доходить до краёв окна, а не только до края отступа под
+ * боковые тулбары).
+ */
+@Composable
+fun TopBarGlyph(onClick: () -> Unit, content: @Composable () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        content()
     }
 }

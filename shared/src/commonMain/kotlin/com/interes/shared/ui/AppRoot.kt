@@ -1,14 +1,25 @@
 package com.interes.shared.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -20,11 +31,17 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.dp
+import com.interes.shared.generated.resources.Res
+import com.interes.shared.generated.resources.app_icon
 import com.interes.shared.model.Photo
 import com.interes.shared.repository.BoardRepository
 import com.interes.shared.storage.BackupPaths
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.painterResource
 
 @Composable
 fun InteresRoot(
@@ -47,6 +64,14 @@ fun InteresRoot(
     var showCreateBoardDialog by remember { mutableStateOf(false) }
     var viewerState by remember { mutableStateOf<Pair<List<Photo>, Int>?>(null) }
     var appOpacityPercent by remember { mutableFloatStateOf(100f) }
+
+    // Поиск досок (главный экран). Поднято сюда из BoardsListScreen.kt —
+    // сама панель с полем поиска теперь рисуется прямо здесь, во всю
+    // ширину ОКНА (см. ниже), а не только в пределах Scaffold того экрана.
+    // showSearchField отдельно от searchQuery: значок лупы разворачивает
+    // поле поиска, крестик его закрывает и одновременно сбрасывает запрос.
+    var showSearchField by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
 
     LaunchedEffect(viewerState == null) {
         if (viewerState == null) appOpacityPercent = 100f
@@ -133,7 +158,8 @@ fun InteresRoot(
                                     onOpenBoard = { id -> selectedBoardId = id },
                                     onCreateBoard = { showCreateBoardDialog = true },
                                     nativeWindowController = nativeWindowController,
-                                    onExitApp = onExitApp
+                                    onExitApp = onExitApp,
+                                    searchQuery = searchQuery
                                 )
                             } else {
                                 val currentTitle = allBoards.firstOrNull { it.id == boardId }?.title
@@ -192,34 +218,132 @@ fun InteresRoot(
                 } else null
             )
 
-            // Заполнители углов — рисуются ПОСЛЕДНИМИ, то есть поверх и
-            // тулбаров, и всего остального. Их размер: ширина ровно как у
-            // соответствующего тулбара (ToolbarWidth / RightToolbarWidth),
-            // высота — как у верхней панели (TopToolbarHeight, одинаковая у
-            // всех трёх экранов). Цвет — TopToolbarColor, тот же,
-            // что и у самой верхней панели (см. BoardsListScreen.kt,
-            // BoardScreen.kt, TrashScreen.kt).
+            // Верхняя панель — рисуется ЗДЕСЬ, а не внутри Scaffold
+            // конкретного экрана: так она по-настоящему тянется от одного
+            // края ОКНА до другого (а не только до края отступа под
+            // боковые тулбары, как было бы внутри инсетнутого контента
+            // выше) и ложится поверх верхних углов SideToolbar/RightToolbar
+            // (рисуется последней — то есть поверх них).
             //
-            // Так верхняя панель визуально "дотягивается" до самых краёв
-            // окна и ложится поверх верхних углов боковых тулбаров, а сами
-            // тулбары остаются полностью рабочими и видимыми ниже этой
-            // полосы — в отличие от предыдущей попытки, где Surface с
-            // контентом занимал всё окно целиком и закрывал тулбары
-            // полностью, а не только сверху.
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .width(ToolbarWidth)
-                    .height(TopToolbarHeight)
-                    .background(TopToolbarColor)
-            )
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .width(RightToolbarWidth)
-                    .height(TopToolbarHeight)
-                    .background(TopToolbarColor)
-            )
+            // На главном экране (список досок) — настоящая, полностью
+            // рабочая панель: значок + название слева, поиск/кнопки окна
+            // справа. На экране доски и в корзине у них СВОЯ верхняя панель
+            // внутри Scaffold (back-кнопка + заголовок) — она по-прежнему
+            // отступает от боковых тулбаров, а тут для них только два
+            // декоративных заполнителя углов, чтобы полоса визуально
+            // продолжалась в их сторону.
+            val isHomeScreen = !showTrash && selectedBoardId == null
+            if (isHomeScreen) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .fillMaxWidth()
+                        .height(TopToolbarHeight)
+                        .background(TopToolbarColor)
+                        .windowDragHandle(nativeWindowController)
+                ) {
+                    // Значок + название приложения — слева, на той же
+                    // горизонтальной линии, что и лупа/кнопки окна справа
+                    // (обе группы — Row с fillMaxHeight + CenterVertically).
+                    // Скрыто в режиме поиска — там на этом месте
+                    // разворачивается поле поиска.
+                    if (!showSearchField) {
+                        Row(
+                            modifier = Modifier
+                                .align(Alignment.CenterStart)
+                                .fillMaxHeight(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Image(
+                                painter = painterResource(Res.drawable.app_icon),
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Interes", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                        }
+                    }
+
+                    if (showSearchField) {
+                        // Режим поиска: строка поиска досок + крестик
+                        // закрытия. Форма и заливка — по образцу рендера в
+                        // чате: скруглённая "таблетка" полупрозрачным белым
+                        // поверх цвета панели, а не стандартный
+                        // прямоугольный OutlinedTextField.
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text("Поиск доски...") },
+                            leadingIcon = { SearchGlyph(color = MaterialTheme.colorScheme.onSurface) },
+                            singleLine = true,
+                            shape = RoundedCornerShape(50),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color.Transparent,
+                                unfocusedBorderColor = Color.Transparent,
+                                focusedContainerColor = Color.White.copy(alpha = 0.35f),
+                                unfocusedContainerColor = Color.White.copy(alpha = 0.35f)
+                            ),
+                            modifier = Modifier
+                                .align(Alignment.CenterStart)
+                                .fillMaxWidth()
+                                .padding(start = 8.dp, end = 48.dp)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .size(40.dp)
+                                .clickable {
+                                    showSearchField = false
+                                    searchQuery = ""
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CloseGlyph()
+                        }
+                    } else {
+                        // Группа кнопок справа: лупа, ровно 60 dp, затем
+                        // "Свернуть / Развернуть / Закрыть" — прижаты к
+                        // самому правому краю окна.
+                        Row(
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .fillMaxHeight(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TopBarGlyph(onClick = { showSearchField = true }) { SearchGlyph() }
+                            Spacer(modifier = Modifier.width(60.dp))
+                            TopBarGlyph(onClick = { nativeWindowController.minimize() }) { MinimizeGlyph() }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            TopBarGlyph(onClick = { nativeWindowController.toggleMaximize() }) { MaximizeGlyph() }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            TopBarGlyph(onClick = onExitApp) { CloseGlyph() }
+                        }
+                    }
+                }
+            } else {
+                // Заполнители углов — их размер: ширина ровно как у
+                // соответствующего тулбара (ToolbarWidth / RightToolbarWidth),
+                // высота — как у верхней панели (TopToolbarHeight, одинаковая
+                // у всех трёх экранов). Цвет — TopToolbarColor, тот же, что
+                // и у собственной верхней панели экрана доски/корзины (см.
+                // BoardScreen.kt, TrashScreen.kt).
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .width(ToolbarWidth)
+                        .height(TopToolbarHeight)
+                        .background(TopToolbarColor)
+                )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .width(RightToolbarWidth)
+                        .height(TopToolbarHeight)
+                        .background(TopToolbarColor)
+                )
+            }
         }
 
         if (showCreateBoardDialog) {

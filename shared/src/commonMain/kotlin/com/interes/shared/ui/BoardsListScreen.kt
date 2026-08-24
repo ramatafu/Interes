@@ -30,7 +30,6 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -55,7 +54,6 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.size.Size
 import com.interes.shared.generated.resources.Res
-import com.interes.shared.generated.resources.app_icon
 import com.interes.shared.generated.resources.board_placeholder
 import com.interes.shared.model.BoardSummary
 import com.interes.shared.repository.BoardRepository
@@ -95,7 +93,13 @@ fun BoardsListScreen(
     onOpenBoard: (Long) -> Unit,
     onCreateBoard: () -> Unit,
     nativeWindowController: NativeWindowController,
-    onExitApp: () -> Unit
+    onExitApp: () -> Unit,
+    // Поиск — состояние теперь в AppRoot.kt: там же теперь рисуется САМА
+    // верхняя панель (см. её комментарий в AppRoot.kt: она должна доходить
+    // до истинных краёв окна, а не только до края отступа под боковые
+    // тулбары, поэтому больше не может жить внутри Scaffold этого экрана).
+    // Здесь запрос используется только для фильтрации сетки досок.
+    searchQuery: String
 ) {
     val scope = rememberCoroutineScope()
 
@@ -104,12 +108,6 @@ fun BoardsListScreen(
     var renamingBoard by remember { mutableStateOf<BoardSummary?>(null) }
     var deletingBoard by remember { mutableStateOf<BoardSummary?>(null) }
 
-    // Поиск досок. showSearchField отдельно от searchQuery: значок лупы
-    // разворачивает поле поиска в тулбаре, крестик его закрывает и
-    // одновременно сбрасывает запрос — так после закрытия поиска список
-    // не остаётся молча отфильтрованным по прошлому запросу.
-    var showSearchField by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
     val visibleBoards = if (searchQuery.isBlank()) {
         boards
     } else {
@@ -124,110 +122,13 @@ fun BoardsListScreen(
         // тот же цвет, что и у тулбаров: 92B1B7.
         containerColor = SideToolbarColor,
         topBar = {
-            // Вся панель — одна перетаскиваемая область: зажатие мышью в
-            // любом свободном месте двигает окно (windowDragHandle). Кнопки
-            // и поле поиска сами глотают свои нажатия, поэтому драг им не
-            // мешает.
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(TopToolbarHeight)
-                    .background(TopToolbarColor)
-                    .windowDragHandle(nativeWindowController)
-            ) {
-                // Значок + название приложения — слева, на той же
-                // горизонтальной линии, что и лупа/кнопки окна справа (обе
-                // группы — Row с fillMaxHeight + CenterVertically). Скрыто в
-                // режиме поиска — там на этом месте разворачивается поле
-                // поиска (см. ветку showSearchField ниже).
-                if (!showSearchField) {
-                    Row(
-                        modifier = Modifier
-                            .align(Alignment.CenterStart)
-                            .fillMaxHeight()
-                            .padding(start = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Image(
-                            painter = painterResource(Res.drawable.app_icon),
-                            contentDescription = null,
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(RoundedCornerShape(6.dp))
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Interes", style = MaterialTheme.typography.titleMedium)
-                    }
-                }
-
-                if (showSearchField) {
-                    // Режим поиска: строка поиска досок + крестик закрытия.
-                    // Форма и заливка — по образцу рендера в чате: скруглённая
-                    // "таблетка" полупрозрачным белым поверх цвета панели,
-                    // а не стандартный прямоугольный OutlinedTextField.
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        placeholder = { Text("Поиск доски...") },
-                        leadingIcon = { SearchGlyph(color = MaterialTheme.colorScheme.onSurface) },
-                        singleLine = true,
-                        shape = RoundedCornerShape(50),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color.Transparent,
-                            unfocusedBorderColor = Color.Transparent,
-                            focusedContainerColor = Color.White.copy(alpha = 0.35f),
-                            unfocusedContainerColor = Color.White.copy(alpha = 0.35f)
-                        ),
-                        modifier = Modifier
-                            .align(Alignment.CenterStart)
-                            .fillMaxWidth()
-                            .padding(start = 8.dp, end = 48.dp)
-                    )
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .size(40.dp)
-                            .clickable {
-                                showSearchField = false
-                                searchQuery = ""
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CloseGlyph()
-                    }
-                } else {
-                    // Группа кнопок справа: лупа, ровно 60 dp, затем
-                    // "Свернуть / Развернуть / Закрыть".
-                    Row(
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .fillMaxHeight()
-                            .padding(end = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Лупа — при нажатии появляется строка поиска досок.
-                        TopBarGlyph(onClick = { showSearchField = true }) { SearchGlyph() }
-
-                        // Ровно 60 dp между лупой и кнопкой "Свернуть" — по ТЗ.
-                        // Кнопки — глифы без внутренних отступов, поэтому
-                        // расстояние честное, не раздутое паддингами.
-                        Spacer(modifier = Modifier.width(60.dp))
-
-                        // Свернуть — замена системной кнопки "_", которой
-                        // больше нет у окна без рамки (undecorated, см. Main.kt).
-                        TopBarGlyph(onClick = { nativeWindowController.minimize() }) { MinimizeGlyph() }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        // Развернуть/восстановить — замена системной кнопки
-                        // "квадратик".
-                        TopBarGlyph(onClick = { nativeWindowController.toggleMaximize() }) { MaximizeGlyph() }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        // Закрыть. Alt+F4 по-прежнему тоже работает (системный
-                        // шорткат ОС), но кнопка в интерфейсе нужна для тех,
-                        // кто про Alt+F4 не вспомнит.
-                        TopBarGlyph(onClick = onExitApp) { CloseGlyph() }
-                    }
-                }
-            }
+            // Сама панель (значок/название/поиск/кнопки окна) теперь
+            // рисуется в AppRoot.kt — во всю ширину ОКНА, а не только до
+            // края отступа под боковые тулбары (как было бы, останься она
+            // здесь, внутри Scaffold, который отступает от SideToolbar/
+            // RightToolbar). Тут — только резервирование той же высоты,
+            // чтобы сетка досок ниже не пряталась под настоящей панелью.
+            Spacer(modifier = Modifier.fillMaxWidth().height(TopToolbarHeight))
         },
         floatingActionButton = {
             // "Создать доску" теперь также есть в SideToolbar (см.
@@ -348,25 +249,6 @@ fun BoardsListScreen(
                 TextButton(onClick = { deletingBoard = null }) { Text("Отмена") }
             }
         )
-    }
-}
-
-/**
- * Компактная кнопка верхнего тулбара: размер по глифу + фиксированная
- * высота 40 dp, БЕЗ внутренних горизонтальных отступов (в отличие от
- * IconButton, который добавляет ~12 dp с каждой стороны и раздувает
- * расстояния между иконками). Ширина по содержимому — поэтому Spacer(60.dp)
- * рядом даёт честные 60 dp между лупой и "Свернуть".
- */
-@Composable
-private fun TopBarGlyph(onClick: () -> Unit, content: @Composable () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(40.dp)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        content()
     }
 }
 
