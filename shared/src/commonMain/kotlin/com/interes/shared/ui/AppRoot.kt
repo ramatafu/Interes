@@ -173,7 +173,8 @@ fun InteresRoot(
                                         repository = repository,
                                         onBack = { selectedBoardId = null },
                                         onPhotoClick = { photos, index -> viewerState = photos to index },
-                                        nativeWindowController = nativeWindowController
+                                        nativeWindowController = nativeWindowController,
+                                        onExitApp = onExitApp
                                     )
                                 }
                             }
@@ -183,7 +184,14 @@ fun InteresRoot(
                     if (currentViewerState != null && pagerState != null) {
                         PhotoViewerContent(
                             photos = currentViewerState.first,
-                            pagerState = pagerState
+                            pagerState = pagerState,
+                            // Инсет сверху/снизу — та же высота, что и у
+                            // верхнего тулбара (TopToolbarHeight), чтобы
+                            // фото ложилось строго МЕЖДУ верхней панелью
+                            // (счётчик/кнопки окна) и нижней границей окна,
+                            // а не заходило под них (было видно самому
+                            // фото под полупрозрачными чипами управления).
+                            modifier = Modifier.padding(top = TopToolbarHeight, bottom = TopToolbarHeight)
                         )
                     }
                 }
@@ -192,7 +200,9 @@ fun InteresRoot(
                     PhotoViewerControls(
                         pageCount = currentViewerState.first.size,
                         currentPage = pagerState.currentPage,
-                        onDismiss = { viewerState = null }
+                        onDismiss = { viewerState = null },
+                        nativeWindowController = nativeWindowController,
+                        onExitApp = onExitApp
                     )
                 }
             }
@@ -242,17 +252,21 @@ fun InteresRoot(
                         .background(TopToolbarColor)
                         .windowDragHandle(nativeWindowController)
                 ) {
-                    // Значок + название приложения — слева, на той же
-                    // горизонтальной линии, что и лупа/кнопки окна справа
-                    // (обе группы — Row с fillMaxHeight + CenterVertically).
-                    // Скрыто в режиме поиска — там на этом месте
-                    // разворачивается поле поиска.
+                    // Значок приложения — на той же вертикальной оси, что и
+                    // иконки левого тулбара (SideToolbar.kt): те центрированы
+                    // по ширине колонки ToolbarWidth (72.dp), поэтому здесь —
+                    // такой же Box шириной ToolbarWidth с центрированием,
+                    // а не Row, прижатый к самому левому краю окна. Название
+                    // "Interes" рядом с иконкой убрано — верхний тулбар
+                    // теперь без текста. Скрыто в режиме поиска — там на
+                    // этом месте разворачивается поле поиска.
                     if (!showSearchField) {
-                        Row(
+                        Box(
                             modifier = Modifier
                                 .align(Alignment.CenterStart)
+                                .width(ToolbarWidth)
                                 .fillMaxHeight(),
-                            verticalAlignment = Alignment.CenterVertically
+                            contentAlignment = Alignment.Center
                         ) {
                             Image(
                                 painter = painterResource(Res.drawable.app_icon),
@@ -261,8 +275,6 @@ fun InteresRoot(
                                     .size(28.dp)
                                     .clip(RoundedCornerShape(6.dp))
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Interes", color = Color.White, style = MaterialTheme.typography.titleMedium)
                         }
                     }
 
@@ -314,11 +326,7 @@ fun InteresRoot(
                         ) {
                             TopBarGlyph(onClick = { showSearchField = true }) { SearchGlyph() }
                             Spacer(modifier = Modifier.width(60.dp))
-                            TopBarGlyph(onClick = { nativeWindowController.minimize() }) { MinimizeGlyph() }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            TopBarGlyph(onClick = { nativeWindowController.toggleMaximize() }) { MaximizeGlyph() }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            TopBarGlyph(onClick = onExitApp) { CloseGlyph() }
+                            WindowControlButtons(nativeWindowController = nativeWindowController, onClose = onExitApp)
                         }
                     }
                 }

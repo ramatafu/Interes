@@ -2,9 +2,17 @@ package com.interes.shared.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -299,5 +307,60 @@ fun TopBarGlyph(onClick: () -> Unit, content: @Composable () -> Unit) {
         contentAlignment = Alignment.Center
     ) {
         content()
+    }
+}
+
+/**
+ * Кнопка "Закрыть" на верхнем тулбаре — та же геометрия, что и у
+ * TopBarGlyph (40.dp квадрат), но с подсветкой при наведении: крестик
+ * становится красным, пока курсор над кнопкой. hoverable() отслеживает
+ * наведение мышью — на десктопе (Windows) работает как положено; на
+ * тач-платформах (Android) hover-события просто никогда не приходят,
+ * так что там кнопка ведёт себя как обычная — без regressions.
+ */
+@Composable
+fun TopBarCloseGlyph(onClick: () -> Unit) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val glyphColor = if (isHovered) CloseHoverColor else Color.White
+
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .hoverable(interactionSource)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        CloseGlyph(color = glyphColor)
+    }
+}
+
+private val CloseHoverColor = Color(0xFFE53935)
+
+/**
+ * Группа "Свернуть / Развернуть / Закрыть" — раньше рисовалась только на
+ * верхней панели главного экрана (см. AppRoot.kt), теперь переиспользуется
+ * и в режиме комнаты (BoardScreen.kt), и в режиме просмотра фотографии
+ * (PhotoViewerControls.kt), чтобы окном можно было управлять из любого
+ * места приложения. onClose обычно = onExitApp из AppRoot.kt (полное
+ * закрытие приложения) — это НЕ то же самое, что "закрыть" в смысле
+ * "вернуться назад" (у BoardScreen для этого своя стрелка "←", у
+ * просмотрщика фото — свой отдельный крестик "выйти из просмотра").
+ */
+@Composable
+fun WindowControlButtons(
+    nativeWindowController: NativeWindowController,
+    onClose: () -> Unit
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        TopBarGlyph(onClick = { nativeWindowController.minimize() }) { MinimizeGlyph() }
+        Spacer(modifier = Modifier.width(12.dp))
+        TopBarGlyph(onClick = { nativeWindowController.toggleMaximize() }) { MaximizeGlyph() }
+        Spacer(modifier = Modifier.width(12.dp))
+        TopBarCloseGlyph(onClick = onClose)
     }
 }

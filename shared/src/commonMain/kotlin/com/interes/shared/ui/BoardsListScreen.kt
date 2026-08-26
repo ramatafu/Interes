@@ -26,7 +26,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -42,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -130,14 +130,8 @@ fun BoardsListScreen(
             // чтобы сетка досок ниже не пряталась под настоящей панелью.
             Spacer(modifier = Modifier.fillMaxWidth().height(TopToolbarHeight))
         },
-        floatingActionButton = {
-            // "Создать доску" теперь также есть в SideToolbar (см.
-            // AppRoot.kt) — тот же колбэк, чтобы диалог был один на оба
-            // источника, а не два независимых состояния.
-            FloatingActionButton(onClick = onCreateBoard) {
-                Text("+", style = MaterialTheme.typography.headlineSmall)
-            }
-        },
+        // FloatingActionButton "+" убран — дублировал значок "+" на левом
+        // тулбаре (SideToolbar.kt), который вызывает тот же onCreateBoard.
         bottomBar = {
             // Статистика — по ВСЕМ доскам, не только по видимым после
             // поиска: это общая сводка по приложению, а не по результатам
@@ -272,21 +266,31 @@ private fun BoardCard(
                 )
             }
     ) {
-        if (board.thumbnailPath != null) {
-            val context = LocalPlatformContext.current
-            AsyncImage(
-                model = remember(board.thumbnailPath) {
-                    ImageRequest.Builder(context)
-                        .data(localFilePathToUri(board.thumbnailPath))
-                        .memoryCacheKey(board.thumbnailPath)
-                        .diskCacheKey(board.thumbnailPath)
-                        .size(Size(480, 480))
-                        .crossfade(true)
-                        .build()
-                },
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
+        if (board.thumbnailPaths.isNotEmpty()) {
+            // Коллаж "1+2": первое фото — 50% площади (слева), второе и
+            // третье делят оставшиеся 50% между собой поровну (сверху и
+            // снизу справа). Если фото меньше 3 — компоновка сама
+            // подстраивается (см. BoardPhotoCollage ниже). Пересобирается
+            // автоматически: thumbnailPaths приходит из реактивного Flow
+            // (observeBoardSummaries), любое добавление/удаление фото в БД
+            // сразу даёт новый список путей и рекомпозицию.
+            BoardPhotoCollage(
+                thumbnailPaths = board.thumbnailPaths,
                 modifier = Modifier.fillMaxSize()
+            )
+            // Лёгкий градиент поверх ВСЕГО коллажа (не поверх отдельных
+            // плиток) — снизу темнее, сверху прозрачно, чтобы название и
+            // счётчик фото читались на любом фоне.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Color.Transparent,
+                            0.55f to Color.Transparent,
+                            1f to Color.Black.copy(alpha = 0.55f)
+                        )
+                    )
             )
         } else {
             // Заглушка для пустой доски — вместо эмодзи-рамки теперь
@@ -337,6 +341,59 @@ private fun BoardCard(
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Коллаж превью доски из 1–3 фото, компоновка "1+2":
+ * - 1 фото — просто на всю карточку;
+ * - 2 фото — пополам по вертикальной линии (слева/справа);
+ * - 3 фото — первое занимает левую половину (50% площади), второе и
+ *   третье делят правую половину пополам по горизонтали (друг над другом).
+ * У каждой миниатюры скруглённые углы 8.dp — отдельно от общего скругления
+ * карточки (16.dp у внешнего Box в BoardCard). thumbnailPaths.isEmpty()
+ * сюда не приходит — этот случай отсеивается заглушкой ещё в BoardCard.
+ */
+@Composable
+private fun BoardPhotoCollage(thumbnailPaths: List<String>, modifier: Modifier = Modifier) {
+    val context = LocalPlatformContext.current
+    // Небольшой зазор между плитками коллажа — иначе скруглённые углы
+    // соседних фото визуально сливаются друг с другом.
+    val gap = 2.dp
+
+    @Composable
+    fun Thumbnail(path: String, thumbnailModifier: Modifier) {
+        AsyncImage(
+            model = remember(path) {
+                ImageRequest.Builder(context)
+                    .data(localFilePathToUri(path))
+                    .memoryCacheKey(path)
+                    .diskCacheKey(path)
+                    .size(Size(480, 480))
+                    .crossfade(true)
+                    .build()
+            },
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = thumbnailModifier.clip(RoundedCornerShape(8.dp))
+        )
+    }
+
+    when (thumbnailPaths.size) {
+        1 -> Thumbnail(thumbnailPaths[0], modifier)
+        2 -> Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(gap)) {
+            Thumbnail(thumbnailPaths[0], Modifier.weight(1f).fillMaxHeight())
+            Thumbnail(thumbnailPaths[1], Modifier.weight(1f).fillMaxHeight())
+        }
+        else -> Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(gap)) {
+            // Первое фото — левая половина, 50% площади всей карточки.
+            Thumbnail(thumbnailPaths[0], Modifier.weight(1f).fillMaxHeight())
+            // Второе и третье — правая половина, поровну друг над другом.
+            Column(modifier = Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(gap)) {
+                Thumbnail(thumbnailPaths[1], Modifier.weight(1f).fillMaxWidth())
+                Thumbnail(thumbnailPaths[2], Modifier.weight(1f).fillMaxWidth())
             }
         }
     }

@@ -40,16 +40,37 @@ UPDATE Board SET deletedAt = NULL WHERE id = ?;
 updateBoardTitle:
 UPDATE Board SET title = ? WHERE id = ?;
 
--- Для карточек в списке досок: название/категория + путь к первому по
--- порядку фото доски (если оно есть) как превью, плюс общее количество
--- фото в доске. LEFT JOIN на превью — чтобы пустые доски (без фото) тоже
--- попадали в список, просто с thumbnailPath = NULL и photoCount = 0.
+-- Для карточек в списке досок: название/категория + пути к первым ТРЁМ
+-- по порядку фото доски (для коллажа "1+2" в BoardsListScreen.kt), плюс
+-- общее количество фото в доске.
+--
+-- ВАЖНО: именно LEFT JOIN, а не скалярный подзапрос в SELECT-списке.
+-- Первая версия этого запроса брала thumbnailPath2/thumbnailPath3 через
+-- "(SELECT filePath ... LIMIT 1 OFFSET N)" — SQLDelight в таком случае
+-- определяет nullable/non-null ПО ИСХОДНОЙ КОЛОНКЕ В СХЕМЕ (Photo.filePath
+-- у нас NOT NULL), а не по тому, что подзапрос может вернуть 0 строк.
+-- Итог — сгенерированный код читал колонку как non-null String с "!!"
+-- внутри, и на доске с 1-2 фото падал NullPointerException на подзапросах
+-- для несуществующего 2-го/3-го фото. LEFT JOIN SQLDelight обрабатывает
+-- отдельно: правая сторона join'а ВСЕГДА nullable независимо от схемы —
+-- поэтому thumbnailPath/2/3 корректно генерируются как String?.
+--
+-- orderIndex внутри доски уникален (BoardRepository.addPhotoToBoard всегда
+-- берёт max(orderIndex)+1), поэтому join по конкретному orderIndex не
+-- размножает строки доски.
 selectBoardsWithThumbnail:
-SELECT Board.id, Board.title, Board.category, Board.createdAt, Photo.filePath AS thumbnailPath,
-    (SELECT COUNT(*) FROM Photo p3 WHERE p3.boardId = Board.id) AS photoCount
+SELECT Board.id, Board.title, Board.category, Board.createdAt,
+    P1.filePath AS thumbnailPath,
+    P2.filePath AS thumbnailPath2,
+    P3.filePath AS thumbnailPath3,
+    (SELECT COUNT(*) FROM Photo pc WHERE pc.boardId = Board.id) AS photoCount
 FROM Board
-LEFT JOIN Photo ON Photo.boardId = Board.id
-    AND Photo.orderIndex = (SELECT MIN(p2.orderIndex) FROM Photo p2 WHERE p2.boardId = Board.id)
+LEFT JOIN Photo P1 ON P1.boardId = Board.id
+    AND P1.orderIndex = (SELECT p.orderIndex FROM Photo p WHERE p.boardId = Board.id ORDER BY p.orderIndex ASC LIMIT 1 OFFSET 0)
+LEFT JOIN Photo P2 ON P2.boardId = Board.id
+    AND P2.orderIndex = (SELECT p.orderIndex FROM Photo p WHERE p.boardId = Board.id ORDER BY p.orderIndex ASC LIMIT 1 OFFSET 1)
+LEFT JOIN Photo P3 ON P3.boardId = Board.id
+    AND P3.orderIndex = (SELECT p.orderIndex FROM Photo p WHERE p.boardId = Board.id ORDER BY p.orderIndex ASC LIMIT 1 OFFSET 2)
 WHERE Board.deletedAt IS NULL
 ORDER BY Board.createdAt DESC;
 

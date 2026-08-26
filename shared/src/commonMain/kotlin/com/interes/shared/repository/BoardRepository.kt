@@ -31,13 +31,22 @@ class BoardRepository(
             .mapToList(ioDispatcher)
             .map { rows -> rows.map { Board(it.id, it.title, it.category, it.createdAt, it.deletedAt) } }
 
-    /** Для экрана списка досок: доска + путь к первому фото как превью. */
+    /**
+     * Для экрана списка досок: доска + пути к первым до 3 фото (для
+     * коллажа-превью "1+2" на карточке). thumbnailPath2/3 из SQL-запроса
+     * могут быть NULL (в доске меньше 3 фото) — listOfNotNull их отсеивает,
+     * так что thumbnailPaths содержит ровно столько путей, сколько реально
+     * есть фото (но не больше 3).
+     */
     fun observeBoardSummaries(): Flow<List<BoardSummary>> =
         db.boardQueries.selectBoardsWithThumbnail()
             .asFlow()
             .mapToList(ioDispatcher)
             .map { rows ->
-                rows.map { BoardSummary(it.id, it.title, it.category, it.createdAt, it.thumbnailPath, it.photoCount.toInt()) }
+                rows.map {
+                    val thumbnailPaths = listOfNotNull(it.thumbnailPath, it.thumbnailPath2, it.thumbnailPath3)
+                    BoardSummary(it.id, it.title, it.category, it.createdAt, thumbnailPaths, it.photoCount.toInt())
+                }
             }
 
     fun observePhotos(boardId: Long): Flow<List<Photo>> =

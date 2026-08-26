@@ -34,7 +34,13 @@ fun BoardScreen(
     repository: BoardRepository,
     onBack: () -> Unit,
     onPhotoClick: (photos: List<Photo>, index: Int) -> Unit,
-    nativeWindowController: NativeWindowController
+    nativeWindowController: NativeWindowController,
+    // "Свернуть/Развернуть/Закрыть" окна — раньше были только на верхней
+    // панели главного экрана, теперь показываются и в режиме комнаты (см.
+    // WindowControlButtons в actions ниже). onExitApp — то же самое полное
+    // закрытие приложения, что и в AppRoot.kt/BoardsListScreen.kt, а не
+    // "назад" (для этого своя стрелка "←", см. navigationIcon ниже).
+    onExitApp: () -> Unit
 ) {
     // remember(boardId) — та же причина, что и в AppRoot.kt: без него
     // каждая перерисовка BoardScreen (а она перерисовывается именно когда
@@ -95,6 +101,11 @@ fun BoardScreen(
                         // Без material-icons-extended — просто стрелка текстом.
                         Text("\u2190", style = MaterialTheme.typography.titleLarge)
                     }
+                },
+                actions = {
+                    // "Свернуть / Развернуть / Закрыть" — теперь и в режиме
+                    // комнаты, не только на главном экране (см. TopBarIcons.kt).
+                    WindowControlButtons(nativeWindowController = nativeWindowController, onClose = onExitApp)
                 }
             )
         },

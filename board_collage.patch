@@ -1,0 +1,206 @@
+diff --git a/shared/src/commonMain/kotlin/com/interes/shared/model/BoardSummary.kt b/shared/src/commonMain/kotlin/com/interes/shared/model/BoardSummary.kt
+index f10e0da..f0e502d 100644
+--- a/shared/src/commonMain/kotlin/com/interes/shared/model/BoardSummary.kt
++++ b/shared/src/commonMain/kotlin/com/interes/shared/model/BoardSummary.kt
+@@ -1,15 +1,18 @@
+ package com.interes.shared.model
+ 
+ /**
+- * Доска для списка досок: те же поля, что у Board, плюс путь к первому
+- * фото доски (для превью на карточке) и общее количество фото в доске.
+- * thumbnailPath = null, если доска ещё пустая (photoCount тогда 0).
++ * Доска для списка досок: те же поля, что у Board, плюс пути к первым
++ * (по orderIndex) фото доски — для коллажа-превью "1+2" на карточке
++ * (см. BoardCard в BoardsListScreen.kt) — и общее количество фото в
++ * доске. thumbnailPaths может содержать от 0 до 3 путей: 0 — доска
++ * пустая (тогда photoCount тоже 0 и рисуется заглушка), меньше 3 —
++ * коллаж показывает только то, что есть.
+  */
+ data class BoardSummary(
+     val id: Long,
+     val title: String,
+     val category: String,
+     val createdAt: Long,
+-    val thumbnailPath: String?,
++    val thumbnailPaths: List<String>,
+     val photoCount: Int
+ )
+diff --git a/shared/src/commonMain/kotlin/com/interes/shared/repository/BoardRepository.kt b/shared/src/commonMain/kotlin/com/interes/shared/repository/BoardRepository.kt
+index 3758f2b..74cc228 100644
+--- a/shared/src/commonMain/kotlin/com/interes/shared/repository/BoardRepository.kt
++++ b/shared/src/commonMain/kotlin/com/interes/shared/repository/BoardRepository.kt
+@@ -31,13 +31,22 @@ class BoardRepository(
+             .mapToList(ioDispatcher)
+             .map { rows -> rows.map { Board(it.id, it.title, it.category, it.createdAt, it.deletedAt) } }
+ 
+-    /** Для экрана списка досок: доска + путь к первому фото как превью. */
++    /**
++     * Для экрана списка досок: доска + пути к первым до 3 фото (для
++     * коллажа-превью "1+2" на карточке). thumbnailPath2/3 из SQL-запроса
++     * могут быть NULL (в доске меньше 3 фото) — listOfNotNull их отсеивает,
++     * так что thumbnailPaths содержит ровно столько путей, сколько реально
++     * есть фото (но не больше 3).
++     */
+     fun observeBoardSummaries(): Flow<List<BoardSummary>> =
+         db.boardQueries.selectBoardsWithThumbnail()
+             .asFlow()
+             .mapToList(ioDispatcher)
+             .map { rows ->
+-                rows.map { BoardSummary(it.id, it.title, it.category, it.createdAt, it.thumbnailPath, it.photoCount.toInt()) }
++                rows.map {
++                    val thumbnailPaths = listOfNotNull(it.thumbnailPath, it.thumbnailPath2, it.thumbnailPath3)
++                    BoardSummary(it.id, it.title, it.category, it.createdAt, thumbnailPaths, it.photoCount.toInt())
++                }
+             }
+ 
+     fun observePhotos(boardId: Long): Flow<List<Photo>> =
+diff --git a/shared/src/commonMain/kotlin/com/interes/shared/ui/BoardsListScreen.kt b/shared/src/commonMain/kotlin/com/interes/shared/ui/BoardsListScreen.kt
+index 4aefc12..f902867 100644
+--- a/shared/src/commonMain/kotlin/com/interes/shared/ui/BoardsListScreen.kt
++++ b/shared/src/commonMain/kotlin/com/interes/shared/ui/BoardsListScreen.kt
+@@ -42,6 +42,7 @@ import androidx.compose.runtime.setValue
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.draw.clip
++import androidx.compose.ui.graphics.Brush
+ import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.input.pointer.pointerInput
+ import androidx.compose.ui.layout.ContentScale
+@@ -272,22 +273,32 @@ private fun BoardCard(
+                 )
+             }
+     ) {
+-        if (board.thumbnailPath != null) {
+-            val context = LocalPlatformContext.current
+-            AsyncImage(
+-                model = remember(board.thumbnailPath) {
+-                    ImageRequest.Builder(context)
+-                        .data(localFilePathToUri(board.thumbnailPath))
+-                        .memoryCacheKey(board.thumbnailPath)
+-                        .diskCacheKey(board.thumbnailPath)
+-                        .size(Size(480, 480))
+-                        .crossfade(true)
+-                        .build()
+-                },
+-                contentDescription = null,
+-                contentScale = ContentScale.Crop,
++        if (board.thumbnailPaths.isNotEmpty()) {
++            // Коллаж "1+2": первое фото — 50% площади (слева), второе и
++            // третье делят оставшиеся 50% между собой поровну (сверху и
++            // снизу справа). Если фото меньше 3 — компоновка сама
++            // подстраивается (см. BoardPhotoCollage ниже). Пересобирается
++            // автоматически: thumbnailPaths приходит из реактивного Flow
++            // (observeBoardSummaries), любое добавление/удаление фото в БД
++            // сразу даёт новый список путей и рекомпозицию.
++            BoardPhotoCollage(
++                thumbnailPaths = board.thumbnailPaths,
+                 modifier = Modifier.fillMaxSize()
+             )
++            // Лёгкий градиент поверх ВСЕГО коллажа (не поверх отдельных
++            // плиток) — снизу темнее, сверху прозрачно, чтобы название и
++            // счётчик фото читались на любом фоне.
++            Box(
++                modifier = Modifier
++                    .fillMaxSize()
++                    .background(
++                        Brush.verticalGradient(
++                            0f to Color.Transparent,
++                            0.55f to Color.Transparent,
++                            1f to Color.Black.copy(alpha = 0.55f)
++                        )
++                    )
++            )
+         } else {
+             // Заглушка для пустой доски — вместо эмодзи-рамки теперь
+             // картинка-заглушка (см. board_placeholder.png).
+@@ -342,6 +353,59 @@ private fun BoardCard(
+     }
+ }
+ 
++/**
++ * Коллаж превью доски из 1–3 фото, компоновка "1+2":
++ * - 1 фото — просто на всю карточку;
++ * - 2 фото — пополам по вертикальной линии (слева/справа);
++ * - 3 фото — первое занимает левую половину (50% площади), второе и
++ *   третье делят правую половину пополам по горизонтали (друг над другом).
++ * У каждой миниатюры скруглённые углы 8.dp — отдельно от общего скругления
++ * карточки (16.dp у внешнего Box в BoardCard). thumbnailPaths.isEmpty()
++ * сюда не приходит — этот случай отсеивается заглушкой ещё в BoardCard.
++ */
++@Composable
++private fun BoardPhotoCollage(thumbnailPaths: List<String>, modifier: Modifier = Modifier) {
++    val context = LocalPlatformContext.current
++    // Небольшой зазор между плитками коллажа — иначе скруглённые углы
++    // соседних фото визуально сливаются друг с другом.
++    val gap = 2.dp
++
++    @Composable
++    fun Thumbnail(path: String, thumbnailModifier: Modifier) {
++        AsyncImage(
++            model = remember(path) {
++                ImageRequest.Builder(context)
++                    .data(localFilePathToUri(path))
++                    .memoryCacheKey(path)
++                    .diskCacheKey(path)
++                    .size(Size(480, 480))
++                    .crossfade(true)
++                    .build()
++            },
++            contentDescription = null,
++            contentScale = ContentScale.Crop,
++            modifier = thumbnailModifier.clip(RoundedCornerShape(8.dp))
++        )
++    }
++
++    when (thumbnailPaths.size) {
++        1 -> Thumbnail(thumbnailPaths[0], modifier)
++        2 -> Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(gap)) {
++            Thumbnail(thumbnailPaths[0], Modifier.weight(1f).fillMaxHeight())
++            Thumbnail(thumbnailPaths[1], Modifier.weight(1f).fillMaxHeight())
++        }
++        else -> Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(gap)) {
++            // Первое фото — левая половина, 50% площади всей карточки.
++            Thumbnail(thumbnailPaths[0], Modifier.weight(1f).fillMaxHeight())
++            // Второе и третье — правая половина, поровну друг над другом.
++            Column(modifier = Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(gap)) {
++                Thumbnail(thumbnailPaths[1], Modifier.weight(1f).fillMaxWidth())
++                Thumbnail(thumbnailPaths[2], Modifier.weight(1f).fillMaxWidth())
++            }
++        }
++    }
++}
++
+ // Не private — используется и здесь (FAB), и из AppRoot.kt (кнопка
+ // "Создать доску" в SideToolbar, видна поверх любого экрана).
+ @Composable
+diff --git a/shared/src/commonMain/sqldelight/com/interes/shared/db/Board.sq b/shared/src/commonMain/sqldelight/com/interes/shared/db/Board.sq
+index 7202c44..d426a7d 100644
+--- a/shared/src/commonMain/sqldelight/com/interes/shared/db/Board.sq
++++ b/shared/src/commonMain/sqldelight/com/interes/shared/db/Board.sq
+@@ -40,16 +40,19 @@ UPDATE Board SET deletedAt = NULL WHERE id = ?;
+ updateBoardTitle:
+ UPDATE Board SET title = ? WHERE id = ?;
+ 
+--- Для карточек в списке досок: название/категория + путь к первому по
+--- порядку фото доски (если оно есть) как превью, плюс общее количество
+--- фото в доске. LEFT JOIN на превью — чтобы пустые доски (без фото) тоже
+--- попадали в список, просто с thumbnailPath = NULL и photoCount = 0.
++-- Для карточек в списке досок: название/категория + пути к первым ТРЁМ
++-- по порядку фото доски (для коллажа "1+2" в BoardsListScreen.kt), плюс
++-- общее количество фото в доске. Коррелированные подзапросы с
++-- LIMIT/OFFSET вместо JOIN — так проще получить именно 1-е/2-е/3-е фото
++-- по возрастанию orderIndex, и доска без фото по-прежнему попадает в
++-- список, просто со всеми thumbnailPathN = NULL и photoCount = 0.
+ selectBoardsWithThumbnail:
+-SELECT Board.id, Board.title, Board.category, Board.createdAt, Photo.filePath AS thumbnailPath,
++SELECT Board.id, Board.title, Board.category, Board.createdAt,
++    (SELECT p.filePath FROM Photo p WHERE p.boardId = Board.id ORDER BY p.orderIndex ASC LIMIT 1) AS thumbnailPath,
++    (SELECT p.filePath FROM Photo p WHERE p.boardId = Board.id ORDER BY p.orderIndex ASC LIMIT 1 OFFSET 1) AS thumbnailPath2,
++    (SELECT p.filePath FROM Photo p WHERE p.boardId = Board.id ORDER BY p.orderIndex ASC LIMIT 1 OFFSET 2) AS thumbnailPath3,
+     (SELECT COUNT(*) FROM Photo p3 WHERE p3.boardId = Board.id) AS photoCount
+ FROM Board
+-LEFT JOIN Photo ON Photo.boardId = Board.id
+-    AND Photo.orderIndex = (SELECT MIN(p2.orderIndex) FROM Photo p2 WHERE p2.boardId = Board.id)
+ WHERE Board.deletedAt IS NULL
+ ORDER BY Board.createdAt DESC;
+ 
