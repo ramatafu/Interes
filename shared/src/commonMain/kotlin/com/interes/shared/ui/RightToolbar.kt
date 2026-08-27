@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -44,7 +45,13 @@ fun RightToolbar(
     modifier: Modifier = Modifier,
     onNextPhoto: (() -> Unit)? = null,
     opacityPercent: Float? = null,
-    onOpacityChange: ((Float) -> Unit)? = null
+    onOpacityChange: ((Float) -> Unit)? = null,
+    // "Добавить фото" — показывается, только когда открыта доска (и в
+    // режиме комнаты, и в режиме просмотра фото: раньше это была отдельная
+    // FloatingActionButton внутри BoardScreen, которая "протекала" поверх
+    // просмотрщика фото, см. BoardScreen.kt). null на главном экране/в
+    // корзине — там добавлять фото некуда.
+    onAddPhoto: (() -> Unit)? = null
 ) {
     var showOpacityDialog by remember { mutableStateOf(false) }
 
@@ -52,8 +59,25 @@ fun RightToolbar(
         modifier = modifier
             .width(RightToolbarWidth)
             .fillMaxHeight()
-            .background(SideToolbarColor)
+            .background(ToolbarBackgroundColor)
     ) {
+        // Та же позиция и те же отступы, что и у верхней группы иконок на
+        // SideToolbar.kt (offset y=110.dp, padding top=12.dp) — чтобы
+        // "Добавить фото" была на одной высоте с "Домой" слева, а не
+        // на произвольной.
+        if (onAddPhoto != null) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .offset(y = 110.dp)
+                    .padding(top = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                ToolbarIconButton(contentDescription = "Добавить фото", onClick = onAddPhoto) { PlusGlyph() }
+            }
+        }
+
         // Стрелка "следующее фото" — ТОЧНО по центру высоты окна,
         // на том же уровне, что и стрелка ◀ на левом тулбаре.
         if (onNextPhoto != null) {

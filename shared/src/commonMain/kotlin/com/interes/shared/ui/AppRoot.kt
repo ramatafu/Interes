@@ -73,6 +73,13 @@ fun InteresRoot(
     var showSearchField by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
+    // Триггер "выбрать фото" для ТЕКУЩЕЙ открытой доски — поднят сюда из
+    // BoardScreen.kt (см. onPickImagesReady там), чтобы кнопка "+" на
+    // правом тулбаре (RightToolbar.kt) могла его вызвать. null, когда
+    // доска не открыта — тогда RightToolbar кнопку вообще не показывает
+    // (см. передачу onAddPhoto ниже).
+    var pickImagesForCurrentBoard by remember { mutableStateOf<(() -> Unit)?>(null) }
+
     LaunchedEffect(viewerState == null) {
         if (viewerState == null) appOpacityPercent = 100f
     }
@@ -174,7 +181,8 @@ fun InteresRoot(
                                         onBack = { selectedBoardId = null },
                                         onPhotoClick = { photos, index -> viewerState = photos to index },
                                         nativeWindowController = nativeWindowController,
-                                        onExitApp = onExitApp
+                                        onExitApp = onExitApp,
+                                        onPickImagesReady = { pickImagesForCurrentBoard = it }
                                     )
                                 }
                             }
@@ -200,9 +208,7 @@ fun InteresRoot(
                     PhotoViewerControls(
                         pageCount = currentViewerState.first.size,
                         currentPage = pagerState.currentPage,
-                        onDismiss = { viewerState = null },
-                        nativeWindowController = nativeWindowController,
-                        onExitApp = onExitApp
+                        onDismiss = { viewerState = null }
                     )
                 }
             }
@@ -217,15 +223,18 @@ fun InteresRoot(
                 onPrevPhoto = onPrevPhoto
             )
 
-            // Правый тулбар: стрелка ▶ + вертикальный ползунок прозрачности
-            // (ползунок виден только при открытом просмотрщике).
+            // Правый тулбар: кнопка "Добавить фото" (только когда открыта
+            // доска — и в комнате, и в просмотрщике фото), стрелка ▶ +
+            // вертикальный ползунок прозрачности (ползунок виден только
+            // при открытом просмотрщике).
             RightToolbar(
                 modifier = Modifier.fillMaxHeight().align(Alignment.CenterEnd),
                 onNextPhoto = onNextPhoto,
                 opacityPercent = if (pagerState != null) appOpacityPercent else null,
                 onOpacityChange = if (pagerState != null) {
                     { appOpacityPercent = it }
-                } else null
+                } else null,
+                onAddPhoto = if (selectedBoardId != null) pickImagesForCurrentBoard else null
             )
 
             // Верхняя панель — рисуется ЗДЕСЬ, а не внутри Scaffold

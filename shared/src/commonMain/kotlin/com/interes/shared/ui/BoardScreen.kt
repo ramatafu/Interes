@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -15,6 +14,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,7 +40,14 @@ fun BoardScreen(
     // WindowControlButtons в actions ниже). onExitApp — то же самое полное
     // закрытие приложения, что и в AppRoot.kt/BoardsListScreen.kt, а не
     // "назад" (для этого своя стрелка "←", см. navigationIcon ниже).
-    onExitApp: () -> Unit
+    onExitApp: () -> Unit,
+    // "Добавить фото" переехала из FloatingActionButton (она "протекала"
+    // поверх просмотрщика фото, т.к. Scaffold рисует FAB поверх всего
+    // контента доски) на правый тулбар (см. AppRoot.kt/RightToolbar.kt).
+    // pickImages создаётся ЗДЕСЬ (rememberImagePicker — платформенный,
+    // должен жить в композиции BoardScreen), а наружу отдаётся сама
+    // функция-триггер — AppRoot передаёт её в RightToolbar как onAddPhoto.
+    onPickImagesReady: (() -> Unit) -> Unit
 ) {
     // remember(boardId) — та же причина, что и в AppRoot.kt: без него
     // каждая перерисовка BoardScreen (а она перерисовывается именно когда
@@ -84,6 +91,14 @@ fun BoardScreen(
         }
     }
 
+    // Отдаём триггер наверх при каждом изменении boardId/pickImages —
+    // именно ДЛЯ ТЕКУЩЕЙ доски, чтобы правый тулбар всегда дёргал
+    // addPhotoToBoard(boardId, ...) для той доски, что открыта сейчас,
+    // а не для предыдущей.
+    LaunchedEffect(boardId, pickImages) {
+        onPickImagesReady(pickImages)
+    }
+
     Scaffold(
         // Фон экрана целиком (позади сетки фото внутри доски) — тот же
         // цвет, что и у тулбаров: 92B1B7.
@@ -109,12 +124,8 @@ fun BoardScreen(
                 }
             )
         },
-        floatingActionButton = {
-            // Без material-icons-extended ради одной иконки — просто "+".
-            FloatingActionButton(onClick = pickImages) {
-                Text("+", style = MaterialTheme.typography.headlineSmall)
-            }
-        },
+        // FloatingActionButton "+" убран — см. onPickImagesReady выше:
+        // кнопка добавления фото теперь на правом тулбаре (AppRoot.kt).
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         PhotoBoardGrid(

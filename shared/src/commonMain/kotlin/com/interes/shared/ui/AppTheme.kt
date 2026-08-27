@@ -28,6 +28,17 @@ val AppPrimaryColor = Color(0xFF0088CC)
 val SideToolbarColor = Color(0xFF273540)
 
 /**
+ * SideToolbarColor с прозрачностью 7% (alpha 0.93) — ТОЛЬКО для левого и
+ * правого тулбаров (SideToolbar.kt/RightToolbar.kt), нижнего тулбара со
+ * статистикой (BottomAppBar в BoardsListScreen.kt) и фона среднего экрана,
+ * где показываются значки досок ("комнат", тот же BoardsListScreen.kt).
+ * Сами значки на тулбарах и экран открытой комнаты (BoardScreen.kt) /
+ * корзины (TrashScreen.kt) эту прозрачность НЕ используют — там по-прежнему
+ * обычный непрозрачный SideToolbarColor.
+ */
+val ToolbarBackgroundColor = SideToolbarColor.copy(alpha = 0.93f)
+
+/**
  * Цвет верхней панели на всех трёх экранах — чуть темнее SideToolbarColor,
  * взят из отдельного образца "Цвет_верхнего_тулбара.jpg" (см. чат): в
  * рендере верхняя панель и боковая — близкие, но не идентичные оттенки.

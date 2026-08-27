@@ -66,7 +66,7 @@ fun SideToolbar(
         modifier = modifier
             .width(ToolbarWidth)
             .fillMaxHeight()
-            .background(SideToolbarColor)
+            .background(ToolbarBackgroundColor)
     ) {
         // Верхняя группа — опущена на 110 dp от верха,
         // расстояние между кнопками +15 dp (spacedBy(15.dp)).
@@ -170,9 +170,12 @@ fun SideToolbar(
 /**
  * Кнопка левой панели — КРУПНЕЕ, чем раньше: 64 dp вместо 48 dp
  * и шрифт headlineLarge вместо headlineSmall.
+ * Не private — переиспользуется из RightToolbar.kt (кнопка "Добавить
+ * фото"), чтобы она была оформлена ТОЧНО так же, как значки слева
+ * (тот же размер/отступы), а не как отдельный самодельный стиль.
  */
 @Composable
-private fun ToolbarIconButton(contentDescription: String, onClick: () -> Unit, content: @Composable () -> Unit) {
+fun ToolbarIconButton(contentDescription: String, onClick: () -> Unit, content: @Composable () -> Unit) {
     IconButton(onClick = onClick, modifier = Modifier.size(64.dp).padding(vertical = 2.dp)) {
         content()
     }

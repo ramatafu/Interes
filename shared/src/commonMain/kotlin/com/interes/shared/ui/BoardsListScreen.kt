@@ -118,9 +118,9 @@ fun BoardsListScreen(
     }
 
     Scaffold(
-        // Фон экрана целиком (позади сетки карточек досок/"комнат") —
-        // тот же цвет, что и у тулбаров: 92B1B7.
-        containerColor = SideToolbarColor,
+        // Фон экрана целиком (позади сетки карточек досок/"комнат") — тот
+        // же цвет, что и у тулбаров, но с прозрачностью 7% (см. AppTheme.kt).
+        containerColor = ToolbarBackgroundColor,
         topBar = {
             // Сама панель (значок/название/поиск/кнопки окна) теперь
             // рисуется в AppRoot.kt — во всю ширину ОКНА, а не только до
@@ -140,7 +140,7 @@ fun BoardsListScreen(
             // разметки.
             if (boards.isNotEmpty()) {
                 val totalPhotos = boards.sumOf { it.photoCount }
-                BottomAppBar(containerColor = SideToolbarColor) {
+                BottomAppBar(containerColor = ToolbarBackgroundColor) {
                     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                         Text(
                             "${boards.size} ${boardsWord(boards.size)} • $totalPhotos ${photosWord(totalPhotos)}",

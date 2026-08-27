@@ -1,6 +1,7 @@
 package com.interes.shared.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -10,11 +11,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -312,8 +315,10 @@ fun TopBarGlyph(onClick: () -> Unit, content: @Composable () -> Unit) {
 
 /**
  * Кнопка "Закрыть" на верхнем тулбаре — та же геометрия, что и у
- * TopBarGlyph (40.dp квадрат), но с подсветкой при наведении: крестик
- * становится красным, пока курсор над кнопкой. hoverable() отслеживает
+ * TopBarGlyph (40.dp квадрат), но с подсветкой при наведении: за
+ * крестиком появляется закруглённая красная заливка (сам крестик остаётся
+ * белым — как в стандартных Windows/Fluent-приложениях, а не просто
+ * красная линия крестика на прозрачном фоне). hoverable() отслеживает
  * наведение мышью — на десктопе (Windows) работает как положено; на
  * тач-платформах (Android) hover-события просто никогда не приходят,
  * так что там кнопка ведёт себя как обычная — без regressions.
@@ -322,7 +327,6 @@ fun TopBarGlyph(onClick: () -> Unit, content: @Composable () -> Unit) {
 fun TopBarCloseGlyph(onClick: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val glyphColor = if (isHovered) CloseHoverColor else Color.White
 
     Box(
         modifier = Modifier
@@ -335,11 +339,19 @@ fun TopBarCloseGlyph(onClick: () -> Unit) {
             ),
         contentAlignment = Alignment.Center
     ) {
-        CloseGlyph(color = glyphColor)
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(if (isHovered) CloseHoverColor else Color.Transparent),
+            contentAlignment = Alignment.Center
+        ) {
+            CloseGlyph(color = Color.White)
+        }
     }
 }
 
-private val CloseHoverColor = Color(0xFFE53935)
+private val CloseHoverColor = Color(0xFFE81123)
 
 /**
  * Группа "Свернуть / Развернуть / Закрыть" — раньше рисовалась только на
