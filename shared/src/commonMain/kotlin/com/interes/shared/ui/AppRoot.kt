@@ -148,7 +148,15 @@ fun InteresRoot(
                             alpha = appOpacityPercent / 100f
                         }
                 ) {
-                    Surface(modifier = Modifier.fillMaxSize()) {
+                    // color = Color.Transparent — иначе Surface без явного
+                    // цвета берёт MaterialTheme.colorScheme.surface (сплошной
+                    // непрозрачный почти-белый) и красит им ВЕСЬ inset-контент
+                    // ПОД Scaffold каждого экрана. Из-за этого 93%-прозрачный
+                    // фон BoardsListScreen (ToolbarBackgroundColor) смешивался
+                    // не с настоящим прозрачным окном (transparent = true в
+                    // Main.kt), а с этим скрытым непрозрачным слоем — и
+                    // прозрачность была практически незаметна.
+                    Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent) {
                         if (showTrash) {
                             TrashScreen(
                                 trashedBoards = trashedBoards,

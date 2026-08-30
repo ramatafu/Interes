@@ -140,10 +140,20 @@ fun BoardsListScreen(
             // разметки.
             if (boards.isNotEmpty()) {
                 val totalPhotos = boards.sumOf { it.photoCount }
-                BottomAppBar(containerColor = ToolbarBackgroundColor) {
+                // containerColor = Color.Transparent — а не ToolbarBackgroundColor
+                // ещё раз: фон ВСЕГО Scaffold (см. containerColor выше) уже
+                // покрывает эту область полупрозрачным цветом. Если покрасить
+                // BottomAppBar своим ТАКИМ ЖЕ 93%-прозрачным цветом поверх —
+                // два одинаковых полупрозрачных слоя друг на друге почти
+                // складываются до непрозрачности (0.93×0.93 ≈ 99.5% непрозрачно)
+                // и нижняя панель визуально выглядит сплошной, в отличие от
+                // остального фона. Transparent здесь даёт ОДИН слой прозрачности
+                // на весь экран — как и должно быть.
+                BottomAppBar(containerColor = Color.Transparent) {
                     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                         Text(
                             "${boards.size} ${boardsWord(boards.size)} • $totalPhotos ${photosWord(totalPhotos)}",
+                            color = Color.White,
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
