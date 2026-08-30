@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import com.interes.shared.model.Photo
 import com.interes.shared.repository.BoardRepository
 import kotlinx.coroutines.launch
@@ -35,12 +36,6 @@ fun BoardScreen(
     onBack: () -> Unit,
     onPhotoClick: (photos: List<Photo>, index: Int) -> Unit,
     nativeWindowController: NativeWindowController,
-    // "Свернуть/Развернуть/Закрыть" окна — раньше были только на верхней
-    // панели главного экрана, теперь показываются и в режиме комнаты (см.
-    // WindowControlButtons в actions ниже). onExitApp — то же самое полное
-    // закрытие приложения, что и в AppRoot.kt/BoardsListScreen.kt, а не
-    // "назад" (для этого своя стрелка "←", см. navigationIcon ниже).
-    onExitApp: () -> Unit,
     // "Добавить фото" переехала из FloatingActionButton (она "протекала"
     // поверх просмотрщика фото, т.к. Scaffold рисует FAB поверх всего
     // контента доски) на правый тулбар (см. AppRoot.kt/RightToolbar.kt).
@@ -106,7 +101,21 @@ fun BoardScreen(
         topBar = {
             TopAppBar(
                 modifier = Modifier.height(TopToolbarHeight),
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = TopToolbarColor),
+                // "Свернуть/Развернуть/Закрыть" здесь БОЛЬШЕ НЕ рисуются —
+                // эта TopAppBar инсетится по бокам под SideToolbar/RightToolbar
+                // (см. padding вокруг контента в AppRoot.kt), поэтому её
+                // правый край не совпадает с настоящим краем ОКНА — кнопки
+                // оказывались левее, чем на главном экране. Теперь кнопки
+                // рисует AppRoot.kt поверх правого угла-заполнителя, у
+                // истинного края окна — там же, где и на главном экране.
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = TopToolbarColor,
+                    // "Назад" и название доски — белым: раньше брали цвет
+                    // по умолчанию из светлой ColorScheme (тёмный, почти
+                    // чёрный) и терялись на тёмном фоне панели.
+                    navigationIconContentColor = Color.White,
+                    titleContentColor = Color.White
+                ),
                 title = {
                     // windowDragHandle — см. тот же приём в BoardsListScreen.kt.
                     Text(boardTitle, modifier = Modifier.windowDragHandle(nativeWindowController))
@@ -116,11 +125,6 @@ fun BoardScreen(
                         // Без material-icons-extended — просто стрелка текстом.
                         Text("\u2190", style = MaterialTheme.typography.titleLarge)
                     }
-                },
-                actions = {
-                    // "Свернуть / Развернуть / Закрыть" — теперь и в режиме
-                    // комнаты, не только на главном экране (см. TopBarIcons.kt).
-                    WindowControlButtons(nativeWindowController = nativeWindowController, onClose = onExitApp)
                 }
             )
         },

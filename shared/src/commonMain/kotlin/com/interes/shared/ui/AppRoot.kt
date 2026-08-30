@@ -189,7 +189,6 @@ fun InteresRoot(
                                         onBack = { selectedBoardId = null },
                                         onPhotoClick = { photos, index -> viewerState = photos to index },
                                         nativeWindowController = nativeWindowController,
-                                        onExitApp = onExitApp,
                                         onPickImagesReady = { pickImagesForCurrentBoard = it }
                                     )
                                 }
@@ -368,6 +367,24 @@ fun InteresRoot(
                         .height(TopToolbarHeight)
                         .background(TopToolbarColor)
                 )
+                // "Свернуть / Развернуть / Закрыть" — рисуются здесь, у
+                // настоящего правого края ОКНА (align в этом самом внешнем
+                // Box), а не внутри TopAppBar экрана доски/корзины: та
+                // инсетится под RightToolbar (см. padding контента выше), и
+                // её правый край не совпадает с краем окна — кнопки были бы
+                // левее, чем на главном экране. Ряд кнопок (144.dp) шире
+                // заполнителя (RightToolbarWidth = 72.dp) и заходит поверх
+                // TopAppBar экрана доски/корзины — там тот же TopToolbarColor
+                // и (после переноса кнопок сюда) actions больше не рисует,
+                // так что стык незаметен.
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .height(TopToolbarHeight),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    WindowControlButtons(nativeWindowController = nativeWindowController, onClose = onExitApp)
+                }
             }
         }
 
