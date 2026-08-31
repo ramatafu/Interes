@@ -186,7 +186,19 @@ fun InteresRoot(
                                         boardId = boardId,
                                         boardTitle = currentTitle,
                                         repository = repository,
-                                        onBack = { selectedBoardId = null },
+                                        // Сначала закрываем просмотрщик фото (если
+                                        // он открыт поверх доски), и только вторым
+                                        // нажатием выходим из самой доски — та же
+                                        // очерёдность, что и у системной кнопки
+                                        // "назад" (см. PlatformBackHandler выше).
+                                        // Раньше здесь было selectedBoardId = null
+                                        // напрямую — стрелка "Назад" на панели
+                                        // доски (та остаётся видна и кликабельна
+                                        // поверх/под просмотрщиком) сразу выкидывала
+                                        // на список досок мимо просмотрщика.
+                                        onBack = {
+                                            if (viewerState != null) viewerState = null else selectedBoardId = null
+                                        },
                                         onPhotoClick = { photos, index -> viewerState = photos to index },
                                         nativeWindowController = nativeWindowController,
                                         onPickImagesReady = { pickImagesForCurrentBoard = it }
