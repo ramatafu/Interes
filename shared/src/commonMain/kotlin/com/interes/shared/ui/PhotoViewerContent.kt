@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -88,6 +89,17 @@ private fun ZoomableImage(
                             offset = if (newScale <= 1f) Offset.Zero else offset + pan
                         }
                     }
+                    launch {
+                        // Колесо мыши — приближение/отдаление (актуально
+                        // для десктопа; на тач-устройствах событий
+                        // PointerEventType.Scroll не бывает, так что этот
+                        // detector там просто не срабатывает).
+                        detectMouseWheelZoom { zoomFactor ->
+                            val newScale = (scale * zoomFactor).coerceIn(1f, 5f)
+                            scale = newScale
+                            if (newScale <= 1f) offset = Offset.Zero
+                        }
+                    }
                 }
             },
         contentAlignment = Alignment.Center
@@ -105,6 +117,26 @@ private fun ZoomableImage(
                     translationY = offset.y
                 }
         )
+    }
+}
+
+private suspend fun PointerInputScope.detectMouseWheelZoom(
+    onZoom: (zoomFactor: Float) -> Unit
+) {
+    awaitPointerEventScope {
+        while (true) {
+            val event = awaitPointerEvent()
+            if (event.type == PointerEventType.Scroll) {
+                val scrollDelta = event.changes.firstOrNull()?.scrollDelta?.y ?: 0f
+                if (scrollDelta != 0f) {
+                    event.changes.forEach { it.consume() }
+                    // Прокрутка "от себя" (вверх, отрицательный y) — приближает,
+                    // "к себе" (вниз, положительный y) — отдаляет.
+                    val zoomFactor = if (scrollDelta < 0f) 1.15f else 1f / 1.15f
+                    onZoom(zoomFactor)
+                }
+            }
+        }
     }
 }
 

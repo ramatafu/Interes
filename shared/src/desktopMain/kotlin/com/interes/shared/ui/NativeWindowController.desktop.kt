@@ -2,6 +2,8 @@ package com.interes.shared.ui
 
 import androidx.compose.ui.awt.ComposeWindow
 import java.awt.Frame
+import java.awt.Rectangle
+import java.awt.Toolkit
 import kotlin.math.roundToInt
 
 actual class NativeWindowController(private val window: ComposeWindow) {
@@ -31,10 +33,26 @@ actual class NativeWindowController(private val window: ComposeWindow) {
     }
 
     actual fun toggleMaximize() {
-        window.extendedState = if (window.extendedState == Frame.MAXIMIZED_BOTH) {
-            Frame.NORMAL
+        if (window.extendedState == Frame.MAXIMIZED_BOTH) {
+            window.extendedState = Frame.NORMAL
         } else {
-            Frame.MAXIMIZED_BOTH
+            // У undecorated-окна (см. Main.kt) MAXIMIZED_BOTH без явного
+            // maximizedBounds разворачивает окно на весь экран целиком,
+            // включая область под панелью задач Windows — Java/AWT
+            // применяет отступ под таскбар автоматически только у окон с
+            // системной рамкой. Считаем "полезную" область экрана (той
+            // монитор, где сейчас окно) сами через getScreenInsets и
+            // разворачиваем только в её границах.
+            val gc = window.graphicsConfiguration
+            val screenBounds = gc.bounds
+            val insets = Toolkit.getDefaultToolkit().getScreenInsets(gc)
+            window.maximizedBounds = Rectangle(
+                screenBounds.x + insets.left,
+                screenBounds.y + insets.top,
+                screenBounds.width - insets.left - insets.right,
+                screenBounds.height - insets.top - insets.bottom
+            )
+            window.extendedState = Frame.MAXIMIZED_BOTH
         }
     }
 
