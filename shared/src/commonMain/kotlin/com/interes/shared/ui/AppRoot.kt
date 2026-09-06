@@ -3,6 +3,7 @@ package com.interes.shared.ui
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -40,6 +41,7 @@ import com.interes.shared.generated.resources.app_icon
 import com.interes.shared.model.Photo
 import com.interes.shared.repository.BoardRepository
 import com.interes.shared.storage.BackupPaths
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 
@@ -84,6 +86,31 @@ fun InteresRoot(
         if (viewerState == null) appOpacityPercent = 100f
     }
 
+    // Отдаём текущий процент прозрачности платформенному контроллеру окна.
+    // На Desktop setOpacityPercent — no-op (прозрачность там по-прежнему
+    // ведёт только graphicsLayer.alpha ниже). На Android это по-настоящему
+    // меняет alpha системного окна Activity — см. NativeWindowController
+    // .android.kt.
+    LaunchedEffect(appOpacityPercent) {
+        nativeWindowController.setOpacityPercent(appOpacityPercent.roundToInt())
+    }
+
+    // Сам ползунок прозрачности — показываем/обновляем/прячем через
+    // платформенный контроллер, а не рисуем прямо здесь Compose-элементом.
+    // На Desktop showOpacitySlider/hideOpacitySlider — no-op (ползунок там
+    // по-прежнему в RightToolbar.kt, ниже). На Android это открывает
+    // отдельное системное окно (Dialog), которое НЕ гаснет вместе с
+    // остальным приложением — см. NativeWindowController.android.kt.
+    LaunchedEffect(viewerState != null, appOpacityPercent) {
+        if (viewerState != null) {
+            nativeWindowController.showOpacitySlider(appOpacityPercent.roundToInt()) { newPercent ->
+                appOpacityPercent = newPercent.toFloat()
+            }
+        } else {
+            nativeWindowController.hideOpacitySlider()
+        }
+    }
+
     PlatformBackHandler(enabled = showTrash) { showTrash = false }
     PlatformBackHandler(enabled = !showTrash && viewerState != null) { viewerState = null }
     PlatformBackHandler(enabled = !showTrash && viewerState == null && selectedBoardId != null) { selectedBoardId = null }
@@ -96,6 +123,47 @@ fun InteresRoot(
 
     InteresTheme {
         Box(modifier = Modifier.fillMaxSize()) {
+            // Ширина боковых колонок — 72.dp на Desktop (как и раньше,
+            // ToolbarWidth/RightToolbarWidth), 48.dp на Android (см. doc в
+            // NativeWindowController.kt: там в колонках теперь только
+            // Корзина/О программе внизу, освободившееся место отдаём сетке
+            // досок). Используется здесь везде вместо захардкоженных
+            // ToolbarWidth/RightToolbarWidth, чтобы контент, сами тулбары и
+            // декоративные заполнители углов были одной ширины.
+            val toolbarWidth = nativeWindowController.sideToolbarWidth
+
+            // На Android главный экран (список досок), экран самой доски
+            // (сетка её фото) И режим просмотра отдельного фото — все
+            // получают ДВЕ горизонтальные полосы (верхняя + всё остальное)
+            // вместо боковых колонок: SideToolbar/RightToolbar там вообще не
+            // рисуются, а инсет контента становится 0 — экран получает
+            // ПОЛНУЮ ширину окна, и стрелка "Назад"/заголовок доски
+            // (BoardScreen.kt, видна и во время просмотра фото — сам
+            // просмотрщик рисуется поверх НИЖЕ её высоты, см. padding в
+            // PhotoViewerContent) оказываются ровно у истинного левого края.
+            // "Корзина"/"О программе" при этом переехали в нижнюю панель
+            // BoardsListScreen.kt (см. её bottomBar); "Добавить фото" на
+            // экране доски — в её собственную верхнюю панель (см.
+            // showAddPhotoInTopBar в BoardScreen.kt).
+            //
+            // Стрелки ◀/▶ (пролистать фото) на Android при этом пропадают —
+            // SideToolbar/RightToolbar с ними больше не рисуются НИГДЕ на
+            // Android. Замена — свайп по фото (HorizontalPager в
+            // PhotoViewerContent и так уже поддерживает это). Ползунок
+            // прозрачности НЕ ЗАТРОНУТ: на Android он и без того рисуется
+            // не здесь, а в отдельном системном окне (см.
+            // nativeWindowController.showOpacitySlider ниже) — от
+            // SideToolbar/RightToolbar никак не зависит.
+            //
+            // Боковые тулбары остаются ТОЛЬКО в корзине (её пока не
+            // трогали) — единственный экран, где hideSideBars всё ещё
+            // false на Android. На Desktop primaryActionsInTopBar всегда
+            // false — там hideSideBars всегда false, ничего не меняется ни
+            // на одном экране.
+            val isHomeScreen = !showTrash && selectedBoardId == null
+            val hideSideBars = nativeWindowController.primaryActionsInTopBar && !showTrash
+
+
             // pagerState поднят сюда: доступен и контенту, и лямбдам тулбаров.
             val currentViewerState = viewerState
             val pagerState = if (currentViewerState != null) {
@@ -138,14 +206,24 @@ fun InteresRoot(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(start = ToolbarWidth, end = RightToolbarWidth)
+                    .padding(
+                        start = if (hideSideBars) 0.dp else toolbarWidth,
+                        end = if (hideSideBars) 0.dp else toolbarWidth
+                    )
             ) {
                 // Затухающий слой: прозрачность гасит ТОЛЬКО контент.
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer {
-                            alpha = appOpacityPercent / 100f
+                            // handlesOpacityNatively == true (Android) —
+                            // прозрачность уже применена ко ВСЕМУ системному
+                            // окну (см. LaunchedEffect выше), этот слой
+                            // остаётся полностью непрозрачным, иначе
+                            // прозрачность применилась бы дважды. На Desktop
+                            // (false) — как и раньше, только этот слой гасит
+                            // содержимое.
+                            alpha = if (nativeWindowController.handlesOpacityNatively) 1f else appOpacityPercent / 100f
                         }
                 ) {
                     // color = Color.Transparent — иначе Surface без явного
@@ -174,7 +252,13 @@ fun InteresRoot(
                                     onCreateBoard = { showCreateBoardDialog = true },
                                     nativeWindowController = nativeWindowController,
                                     onExitApp = onExitApp,
-                                    searchQuery = searchQuery
+                                    searchQuery = searchQuery,
+                                    // "Корзина" в нижней панели — только на
+                                    // Android (см. hideSideBars выше и
+                                    // bottomBar в BoardsListScreen.kt): там
+                                    // SideToolbar на главном экране не
+                                    // рисуется, и корзина переезжает сюда.
+                                    onOpenTrash = { showTrash = true }
                                 )
                             } else {
                                 val currentTitle = allBoards.firstOrNull { it.id == boardId }?.title
@@ -201,7 +285,13 @@ fun InteresRoot(
                                         },
                                         onPhotoClick = { photos, index -> viewerState = photos to index },
                                         nativeWindowController = nativeWindowController,
-                                        onPickImagesReady = { pickImagesForCurrentBoard = it }
+                                        onPickImagesReady = { pickImagesForCurrentBoard = it },
+                                        // На Android, пока не открыт просмотрщик
+                                        // фото, RightToolbar (с "Добавить фото")
+                                        // не рисуется вовсе (см. hideSideBars
+                                        // выше) — кнопка переезжает в верхнюю
+                                        // панель самой доски.
+                                        showAddPhotoInTopBar = hideSideBars
                                     )
                                 }
                             }
@@ -227,34 +317,73 @@ fun InteresRoot(
                     PhotoViewerControls(
                         pageCount = currentViewerState.first.size,
                         currentPage = pagerState.currentPage,
-                        onDismiss = { viewerState = null }
+                        onDismiss = { viewerState = null },
+                        // На Android крестик убран — закрытие просмотра
+                        // теперь только системной кнопкой/жестом "Назад"
+                        // (см. PlatformBackHandler выше). На Desktop
+                        // остаётся true по умолчанию — там это единственный
+                        // способ выйти.
+                        showDismissButton = !nativeWindowController.primaryActionsInTopBar
                     )
                 }
             }
 
-            // Левый тулбар со стрелкой ◀.
-            SideToolbar(
-                modifier = Modifier.fillMaxHeight().align(Alignment.CenterStart),
-                onHome = goHome,
-                onCreateBoard = { showCreateBoardDialog = true },
-                backupPaths = backupPaths,
-                onOpenTrash = { showTrash = true },
-                onPrevPhoto = onPrevPhoto
-            )
+            // Левый тулбар со стрелкой ◀. На Android не рисуется, пока
+            // hideSideBars (главный экран, экран доски и просмотр фото) —
+            // "Корзина" переехала в нижнюю панель BoardsListScreen.kt, а
+            // "Домой/+/Резервная копия" и так уже в верхнем тулбаре. Только
+            // в корзине — рисуется как обычно.
+            if (!hideSideBars) {
+                SideToolbar(
+                    modifier = Modifier.fillMaxHeight().align(Alignment.CenterStart),
+                    onHome = goHome,
+                    onCreateBoard = { showCreateBoardDialog = true },
+                    backupPaths = backupPaths,
+                    onOpenTrash = { showTrash = true },
+                    onPrevPhoto = onPrevPhoto,
+                    // На Android эта группа кнопок теперь в верхнем тулбаре
+                    // (см. ниже, PrimaryActionButtons) — здесь не дублируем.
+                    showPrimaryActions = !nativeWindowController.primaryActionsInTopBar,
+                    width = toolbarWidth,
+                    // compact сжимает кнопку "Корзина" внизу до 40.dp — нужно,
+                    // раз сама колонка на Android уже 48.dp, а не 72.dp (см.
+                    // toolbarWidth выше).
+                    compact = nativeWindowController.primaryActionsInTopBar
+                )
+            }
 
-            // Правый тулбар: кнопка "Добавить фото" (только когда открыта
-            // доска — и в комнате, и в просмотрщике фото), стрелка ▶ +
-            // вертикальный ползунок прозрачности (ползунок виден только
-            // при открытом просмотрщике).
-            RightToolbar(
-                modifier = Modifier.fillMaxHeight().align(Alignment.CenterEnd),
-                onNextPhoto = onNextPhoto,
-                opacityPercent = if (pagerState != null) appOpacityPercent else null,
-                onOpacityChange = if (pagerState != null) {
-                    { appOpacityPercent = it }
-                } else null,
-                onAddPhoto = if (selectedBoardId != null) pickImagesForCurrentBoard else null
-            )
+            // Правый тулбар: кнопка "Добавить фото" (на Android не нужна —
+            // она теперь в верхней панели самой доски, см.
+            // showAddPhotoInTopBar в BoardScreen.kt), стрелка ▶ +
+            // вертикальный ползунок прозрачности. На Android не рисуется,
+            // пока hideSideBars — "О программе" переехала в нижнюю панель
+            // BoardsListScreen.kt. На Desktop рисуется как обычно на всех
+            // экранах.
+            if (!hideSideBars) {
+                RightToolbar(
+                    modifier = Modifier.fillMaxHeight().align(Alignment.CenterEnd),
+                    onNextPhoto = onNextPhoto,
+                    // Свой (вертикальный) ползунок RightToolbar — только когда
+                    // прозрачность НЕ обрабатывается нативно (Desktop). На
+                    // Android (handlesOpacityNatively == true) ползунок теперь
+                    // рисуется в отдельном системном окне (см.
+                    // nativeWindowController.showOpacitySlider выше), здесь
+                    // остаётся null.
+                    opacityPercent = if (pagerState != null && !nativeWindowController.handlesOpacityNatively) appOpacityPercent else null,
+                    onOpacityChange = if (pagerState != null && !nativeWindowController.handlesOpacityNatively) {
+                        { appOpacityPercent = it }
+                    } else null,
+                    onAddPhoto = if (selectedBoardId != null) pickImagesForCurrentBoard else null,
+                    // На Android "О программе" переехала сюда, на уровень
+                    // корзины (см. SideToolbar.kt) — видна всегда, как и
+                    // корзина, а не только на главном экране.
+                    showAboutButton = nativeWindowController.primaryActionsInTopBar,
+                    width = toolbarWidth,
+                    // compact сжимает "Добавить фото" и "О программе" до 40.dp —
+                    // нужно при узкой (48.dp) колонке на Android.
+                    compact = nativeWindowController.primaryActionsInTopBar
+                )
+            }
 
             // Верхняя панель — рисуется ЗДЕСЬ, а не внутри Scaffold
             // конкретного экрана: так она по-настоящему тянется от одного
@@ -270,7 +399,6 @@ fun InteresRoot(
             // отступает от боковых тулбаров, а тут для них только два
             // декоративных заполнителя углов, чтобы полоса визуально
             // продолжалась в их сторону.
-            val isHomeScreen = !showTrash && selectedBoardId == null
             if (isHomeScreen) {
                 Box(
                     modifier = Modifier
@@ -292,7 +420,7 @@ fun InteresRoot(
                         Box(
                             modifier = Modifier
                                 .align(Alignment.CenterStart)
-                                .width(ToolbarWidth)
+                                .width(toolbarWidth)
                                 .fillMaxHeight(),
                             contentAlignment = Alignment.Center
                         ) {
@@ -343,9 +471,8 @@ fun InteresRoot(
                             CloseGlyph()
                         }
                     } else {
-                        // Группа кнопок справа: лупа, ровно 60 dp, затем
-                        // "Свернуть / Развернуть / Закрыть" — прижаты к
-                        // самому правому краю окна.
+                        // Правая группа: лупа (и, на Desktop, кнопки окна) —
+                        // прижаты к самому правому краю окна.
                         Row(
                             modifier = Modifier
                                 .align(Alignment.CenterEnd)
@@ -353,8 +480,46 @@ fun InteresRoot(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             TopBarGlyph(onClick = { showSearchField = true }) { SearchGlyph() }
-                            Spacer(modifier = Modifier.width(60.dp))
-                            WindowControlButtons(nativeWindowController = nativeWindowController, onClose = onExitApp)
+                            // "Свернуть/Развернуть/Закрыть" — только там, где
+                            // у платформы есть своё окно с рамкой (Desktop).
+                            // На Android showWindowControls == false, кнопки
+                            // не рисуются вовсе.
+                            if (nativeWindowController.showWindowControls) {
+                                Spacer(modifier = Modifier.width(60.dp))
+                                WindowControlButtons(nativeWindowController = nativeWindowController, onClose = onExitApp)
+                            }
+                        }
+
+                        // "Домой/Создать доску/Резервная копия" — РАВНОМЕРНО
+                        // распределены В ПРОМЕЖУТКЕ между значком приложения
+                        // (заканчивается на ToolbarWidth от левого края) и
+                        // лупой (TopBarGlyph, 40.dp, у самого правого края) —
+                        // отступы start/end этого Row обрезают его ровно до
+                        // этого промежутка, а SpaceEvenly делит его на равные
+                        // доли (равный зазор до первой кнопки, между кнопками
+                        // и после последней). Только на Android
+                        // (primaryActionsInTopBar == true); на Desktop эта
+                        // группа остаётся в SideToolbar.kt.
+                        if (nativeWindowController.primaryActionsInTopBar) {
+                            Row(
+                                modifier = Modifier
+                                    .align(Alignment.CenterStart)
+                                    .fillMaxWidth()
+                                    .padding(start = toolbarWidth, end = 40.dp),
+                                horizontalArrangement = Arrangement.SpaceEvenly,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                PrimaryActionButtons(
+                                    onHome = goHome,
+                                    onCreateBoard = { showCreateBoardDialog = true },
+                                    backupPaths = backupPaths,
+                                    compact = true,
+                                    // "О программе" сюда не переезжает — она
+                                    // в правом тулбаре, на уровне корзины
+                                    // (см. RightToolbar, showAboutButton).
+                                    includeInfo = false
+                                )
+                            }
                         }
                     }
                 }
@@ -365,20 +530,30 @@ fun InteresRoot(
                 // у всех трёх экранов). Цвет — TopToolbarColor, тот же, что
                 // и у собственной верхней панели экрана доски/корзины (см.
                 // BoardScreen.kt, TrashScreen.kt).
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .width(ToolbarWidth)
-                        .height(TopToolbarHeight)
-                        .background(TopToolbarColor)
-                )
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .width(RightToolbarWidth)
-                        .height(TopToolbarHeight)
-                        .background(TopToolbarColor)
-                )
+                //
+                // На Android, пока боковые тулбары скрыты (hideSideBars —
+                // сейчас это экран доски и просмотр фото, см. doc выше),
+                // заполнители не рисуются вовсе: собственная TopAppBar
+                // экрана доски теперь и так во всю ширину окна (инсет
+                // контента = 0), рисовать эти два квадрата было бы не рядом
+                // с несуществующим боковым тулбаром, а поверх кнопок "Назад"/
+                // "+" самой панели.
+                if (!hideSideBars) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .width(toolbarWidth)
+                            .height(TopToolbarHeight)
+                            .background(TopToolbarColor)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .width(toolbarWidth)
+                            .height(TopToolbarHeight)
+                            .background(TopToolbarColor)
+                    )
+                }
                 // "Свернуть / Развернуть / Закрыть" — рисуются здесь, у
                 // настоящего правого края ОКНА (align в этом самом внешнем
                 // Box), а не внутри TopAppBar экрана доски/корзины: та
@@ -389,13 +564,15 @@ fun InteresRoot(
                 // TopAppBar экрана доски/корзины — там тот же TopToolbarColor
                 // и (после переноса кнопок сюда) actions больше не рисует,
                 // так что стык незаметен.
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .height(TopToolbarHeight),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    WindowControlButtons(nativeWindowController = nativeWindowController, onClose = onExitApp)
+                if (nativeWindowController.showWindowControls) {
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .height(TopToolbarHeight),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        WindowControlButtons(nativeWindowController = nativeWindowController, onClose = onExitApp)
+                    }
                 }
             }
         }

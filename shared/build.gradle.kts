@@ -16,6 +16,16 @@ kotlin {
         namespace = "com.interes.shared"
         compileSdk = 36
         minSdk = 26
+
+        // ВАЖНО: у нового плагина com.android.kotlin.multiplatform.library
+        // обработка Android-ресурсов по умолчанию ВЫКЛЮЧЕНА. Без этого флага
+        // сгенерированные Compose-ресурсы (app_icon.png, шрифт Inter и т.д.)
+        // не копируются в assets и не попадают в APK — приложение падает при
+        // старте с MissingResourceException, хотя сами файлы лежат в
+        // composeResources и десктопная сборка работает нормально.
+        androidResources {
+            enable = true
+        }
     }
 
     jvm("desktop")

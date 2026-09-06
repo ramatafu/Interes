@@ -20,7 +20,9 @@ class MainActivity : ComponentActivity() {
         BoardRepository(db, PhotoFileStorage(applicationContext), Dispatchers.IO)
     }
     private val backupPaths: BackupPaths by lazy { BackupPaths(applicationContext) }
-    private val nativeWindowController = NativeWindowController()
+    // Передаём саму Activity — нужна её Window, чтобы по-настоящему менять
+    // альфу системного окна (см. NativeWindowController.android.kt).
+    private val nativeWindowController = NativeWindowController(this)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

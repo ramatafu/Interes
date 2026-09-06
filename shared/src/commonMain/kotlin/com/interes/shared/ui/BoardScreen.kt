@@ -42,7 +42,13 @@ fun BoardScreen(
     // pickImages создаётся ЗДЕСЬ (rememberImagePicker — платформенный,
     // должен жить в композиции BoardScreen), а наружу отдаётся сама
     // функция-триггер — AppRoot передаёт её в RightToolbar как onAddPhoto.
-    onPickImagesReady: (() -> Unit) -> Unit
+    onPickImagesReady: (() -> Unit) -> Unit,
+    // true на Android, пока не открыт просмотрщик фото (см. hideSideBars в
+    // AppRoot.kt) — там RightToolbar с "Добавить фото" не рисуется вовсе, и
+    // кнопка добавления фото рисуется прямо здесь, в верхней панели самой
+    // доски. false — на Desktop, и на Android во время просмотра фото:
+    // там кнопка остаётся в RightToolbar, как и раньше.
+    showAddPhotoInTopBar: Boolean = false
 ) {
     // remember(boardId) — та же причина, что и в AppRoot.kt: без него
     // каждая перерисовка BoardScreen (а она перерисовывается именно когда
@@ -124,6 +130,13 @@ fun BoardScreen(
                     IconButton(onClick = onBack) {
                         // Без material-icons-extended — просто стрелка текстом.
                         Text("\u2190", style = MaterialTheme.typography.titleLarge)
+                    }
+                },
+                actions = {
+                    if (showAddPhotoInTopBar) {
+                        IconButton(onClick = pickImages) {
+                            PlusGlyph()
+                        }
                     }
                 }
             )

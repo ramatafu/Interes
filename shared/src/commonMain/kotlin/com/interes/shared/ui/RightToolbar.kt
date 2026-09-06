@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -51,13 +52,26 @@ fun RightToolbar(
     // FloatingActionButton внутри BoardScreen, которая "протекала" поверх
     // просмотрщика фото, см. BoardScreen.kt). null на главном экране/в
     // корзине — там добавлять фото некуда.
-    onAddPhoto: (() -> Unit)? = null
+    onAddPhoto: (() -> Unit)? = null,
+    // true на Android (см. AppRoot.kt, nativeWindowController
+    // .primaryActionsInTopBar) — "О программе" переехала сюда с левого
+    // тулбара, на тот же уровень, что и корзина там (низ, за разделителем).
+    // false на Desktop — там кнопка осталась в SideToolbar.kt, как и была.
+    showAboutButton: Boolean = false,
+    // Ширина колонки — из nativeWindowController.sideToolbarWidth
+    // (AppRoot.kt). По умолчанию RightToolbarWidth (72.dp) — как было.
+    width: Dp = RightToolbarWidth,
+    // true на Android — "Добавить фото" и "О программе" сжаты до 40.dp
+    // (TopBarGlyph) вместо 64.dp (ToolbarIconButton): при width = 56.dp
+    // 64.dp кнопка не поместилась бы. На Desktop (width = 72.dp) кнопки
+    // остаются прежнего размера.
+    compact: Boolean = false
 ) {
     var showOpacityDialog by remember { mutableStateOf(false) }
 
     Box(
         modifier = modifier
-            .width(RightToolbarWidth)
+            .width(width)
             .fillMaxHeight()
             .background(ToolbarBackgroundColor)
     ) {
@@ -74,7 +88,11 @@ fun RightToolbar(
                     .padding(top = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                ToolbarIconButton(contentDescription = "Добавить фото", onClick = onAddPhoto) { PlusGlyph() }
+                if (compact) {
+                    TopBarGlyph(onClick = onAddPhoto) { PlusGlyph() }
+                } else {
+                    ToolbarIconButton(contentDescription = "Добавить фото", onClick = onAddPhoto) { PlusGlyph() }
+                }
             }
         }
 
@@ -85,7 +103,7 @@ fun RightToolbar(
                 onClick = onNextPhoto,
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .size(64.dp)
+                    .size(if (compact) 48.dp else 64.dp)
             ) {
                 ChevronRightGlyph()
             }
@@ -156,6 +174,21 @@ fun RightToolbar(
                         TextButton(onClick = { showOpacityDialog = false }) { Text("Отмена") }
                     }
                 )
+            }
+        }
+        // Нижняя группа — прижата к низу, тот же вид (разделитель + одна
+        // кнопка), что у группы с корзиной на SideToolbar.kt, чтобы "О
+        // программе" была на той же высоте, что и корзина слева.
+        if (showAboutButton) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                HorizontalDivider(color = Color.White.copy(alpha = 0.3f), modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
+                AboutButton(compact = compact)
             }
         }
     }

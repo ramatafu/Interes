@@ -1,6 +1,8 @@
 package com.interes.shared.ui
 
 import androidx.compose.ui.awt.ComposeWindow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import java.awt.Frame
 import java.awt.Rectangle
 import java.awt.Toolkit
@@ -14,6 +16,22 @@ actual class NativeWindowController(private val window: ComposeWindow) {
     actual fun setOpacityPercent(percent: Int) {
         // No-op: прозрачность ведёт graphicsLayer.alpha в AppRoot.kt.
     }
+
+    // На Desktop своё undecorated-окно без системной рамки — кнопки
+    // "Свернуть/Развернуть/Закрыть" (WindowControlButtons) остаются, как и
+    // раньше, единственным способом им управлять.
+    actual val showWindowControls: Boolean = true
+
+    // На Desktop всё остаётся в левом боковом тулбаре, как и было.
+    actual val primaryActionsInTopBar: Boolean = false
+
+    // null — сетка досок сама подбирает число колонок под ширину окна, как
+    // и раньше (AdaptiveMaxColumns в BoardsListScreen.kt).
+    actual val fixedBoardGridColumns: Int? = null
+
+    // 72.dp — то же самое значение, что и было в ToolbarWidth/
+    // RightToolbarWidth, поведение не меняется.
+    actual val sideToolbarWidth: Dp = 72.dp
 
     actual fun getWindowPosition(): Pair<Int, Int> {
         val loc = window.location
@@ -59,4 +77,10 @@ actual class NativeWindowController(private val window: ComposeWindow) {
     actual fun minimize() {
         window.extendedState = Frame.ICONIFIED
     }
+
+    // Не нужно: на Desktop ползунок и так вне затухающего слоя (см.
+    // RightToolbar.kt, вызывается напрямую из AppRoot.kt как обычный
+    // composable) — своё отдельное окно ему не требуется.
+    actual fun showOpacitySlider(percent: Int, onChange: (Int) -> Unit) {}
+    actual fun hideOpacitySlider() {}
 }

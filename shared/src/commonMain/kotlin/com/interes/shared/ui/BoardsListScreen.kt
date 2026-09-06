@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -99,7 +100,13 @@ fun BoardsListScreen(
     // до истинных краёв окна, а не только до края отступа под боковые
     // тулбары, поэтому больше не может жить внутри Scaffold этого экрана).
     // Здесь запрос используется только для фильтрации сетки досок.
-    searchQuery: String
+    searchQuery: String,
+    // "Корзина" в нижней панели — только на Android (см. bottomBar ниже):
+    // там на главном экране SideToolbar вообще не рисуется (см.
+    // hideSideBarsOnHome в AppRoot.kt), и корзина переезжает сюда. На
+    // Desktop этот колбэк передаётся, но не используется — там корзина
+    // по-прежнему в SideToolbar.kt.
+    onOpenTrash: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
 
@@ -150,12 +157,26 @@ fun BoardsListScreen(
                 // остального фона. Transparent здесь даёт ОДИН слой прозрачности
                 // на весь экран — как и должно быть.
                 BottomAppBar(containerColor = Color.Transparent) {
-                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Text(
-                            "${boards.size} ${boardsWord(boards.size)} • $totalPhotos ${photosWord(totalPhotos)}",
-                            color = Color.White,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                    val countText = "${boards.size} ${boardsWord(boards.size)} • $totalPhotos ${photosWord(totalPhotos)}"
+                    if (nativeWindowController.primaryActionsInTopBar) {
+                        // Android: "Корзина" слева, счётчик по центру, "О
+                        // программе" справа — SideToolbar/RightToolbar на
+                        // этом экране не рисуются (см. hideSideBarsOnHome в
+                        // AppRoot.kt), эти две кнопки живут только здесь.
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TopBarGlyph(onClick = onOpenTrash) { TrashGlyph() }
+                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                Text(countText, color = Color.White, style = MaterialTheme.typography.bodyMedium)
+                            }
+                            AboutButton(compact = true)
+                        }
+                    } else {
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            Text(countText, color = Color.White, style = MaterialTheme.typography.bodyMedium)
+                        }
                     }
                 }
             }
@@ -176,26 +197,65 @@ fun BoardsListScreen(
                 Text("Ничего не найдено по запросу \"$searchQuery\"")
             }
         } else {
-            LazyVerticalGrid(
-                // AdaptiveMaxColumns (см. ниже в файле) — не GridCells.Adaptive
-                // напрямую и не GridCells.Fixed(8): на телефоне/узком окне
-                // должно быть меньше 8 колонок (иначе карточки станут
-                // нечитаемо мелкими), а на широком — вплоть до 8, но не больше
-                // (по ТЗ: "максимум 8 в строке"). minSize — минимальная
-                // ширина карточки, тот же смысл, что раньше был в Adaptive.
-                columns = AdaptiveMaxColumns(minSize = 160.dp, maxColumns = 8),
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(visibleBoards, key = { it.id }) { board ->
-                    BoardCard(
-                        board = board,
-                        onClick = { onOpenBoard(board.id) },
-                        onLongPress = { actionsFor = board },
-                        onActionsClick = { actionsFor = board }
-                    )
+            // На Android (fixedBoardGridColumns != null, см. doc в
+            // NativeWindowController.kt) отступы вокруг сетки и МЕЖДУ РЯДАМИ
+            // сжаты (2.dp вместо 8.dp — было 4.dp, уменьшено ещё раз по
+            // просьбе "комнаты ещё шире") — при фиксированных 2 колонках это
+            // способ увеличить сами карточки (пропорционально, без искажения
+            // формы). Расстояние МЕЖДУ ДОСКАМИ В РЯДУ (по горизонтали) —
+            // отдельное значение, 5.dp, задано явно и не связано с gridGap.
+            // На Desktop ничего не трогаем — там всё по 8.dp, как и раньше.
+            val gridGap = if (nativeWindowController.fixedBoardGridColumns != null) 2.dp else 8.dp
+            val horizontalGap = if (nativeWindowController.fixedBoardGridColumns != null) 5.dp else gridGap
+
+            // BoxWithConstraints — чтобы узнать РЕАЛЬНО видимую высоту (уже
+            // за вычетом верхней/нижней панели, см. .padding(padding) здесь)
+            // и посчитать высоту карточки так, чтобы влезало ровно 3 ряда
+            // без прокрутки — а не как раньше, через aspectRatio (тот высоту
+            // экрана вообще не учитывает, 3 ряда могли не влезть или
+            // остаться с пустым хвостом). Только на Android
+            // (fixedBoardGridColumns != null) — на Desktop cardHeight
+            // остаётся null, и BoardCard считает высоту по-старому, через
+            // aspectRatio(0.85f). Использует gridGap (вертикальный зазор), а
+            // не horizontalGap — горизонтальный зазор на высоту рядов не
+            // влияет.
+            BoxWithConstraints(modifier = Modifier.fillMaxSize().padding(padding)) {
+                val visibleRows = 3
+                val cardHeight = if (nativeWindowController.fixedBoardGridColumns != null) {
+                    // Между рядами (visibleRows - 1) зазоров + 2 отступа
+                    // contentPadding (сверху и снизу) = (visibleRows + 1)
+                    // зазоров суммарно по вертикали.
+                    ((maxHeight - gridGap * (visibleRows + 1)) / visibleRows).coerceAtLeast(0.dp)
+                } else {
+                    null
+                }
+
+                LazyVerticalGrid(
+                    // На Android nativeWindowController.fixedBoardGridColumns
+                    // == 2 — ровно по 2 доски в ряд, всегда (см. doc в
+                    // NativeWindowController.kt). На Desktop это null, и сетка
+                    // ведёт себя как раньше: AdaptiveMaxColumns сама подбирает
+                    // число колонок под ширину окна (не GridCells.Adaptive
+                    // напрямую и не GridCells.Fixed(8): на телефоне/узком окне
+                    // должно быть меньше 8 колонок, а на широком — вплоть до 8,
+                    // но не больше; minSize — минимальная ширина карточки).
+                    columns = nativeWindowController.fixedBoardGridColumns?.let { GridCells.Fixed(it) }
+                        ?: AdaptiveMaxColumns(minSize = 160.dp, maxColumns = 8),
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(gridGap),
+                    horizontalArrangement = Arrangement.spacedBy(horizontalGap),
+                    verticalArrangement = Arrangement.spacedBy(gridGap)
+                ) {
+                    items(visibleBoards, key = { it.id }) { board ->
+                        BoardCard(
+                            board = board,
+                            onClick = { onOpenBoard(board.id) },
+                            onLongPress = { actionsFor = board },
+                            onActionsClick = { actionsFor = board },
+                            nativeWindowController = nativeWindowController,
+                            heightOverride = cardHeight
+                        )
+                    }
                 }
             }
         }
@@ -261,12 +321,19 @@ private fun BoardCard(
     board: BoardSummary,
     onClick: () -> Unit,
     onLongPress: () -> Unit,
-    onActionsClick: () -> Unit
+    onActionsClick: () -> Unit,
+    nativeWindowController: NativeWindowController,
+    // Высота карточки, посчитанная под "ровно 3 ряда видно" (Android, см.
+    // BoardsListScreen выше). null — на Desktop, там высота по-прежнему
+    // берётся из aspectRatio(0.85f) ниже, как и было всегда.
+    heightOverride: Dp? = null
 ) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(0.85f)
+            .then(
+                if (heightOverride != null) Modifier.height(heightOverride) else Modifier.aspectRatio(0.85f)
+            )
             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .pointerInput(board.id) {
@@ -324,7 +391,16 @@ private fun BoardCard(
                 .padding(4.dp)
                 .size(28.dp)
                 .clip(CircleShape)
-                .background(Color.Black.copy(alpha = 0.35f))
+                .background(
+                    // Подсветка — цвет верхнего тулбара (TopToolbarColor),
+                    // только на Android (по просьбе). На Desktop оставлен
+                    // исходный полупрозрачный чёрный.
+                    if (nativeWindowController.fixedBoardGridColumns != null) {
+                        TopToolbarColor
+                    } else {
+                        Color.Black.copy(alpha = 0.35f)
+                    }
+                )
         ) {
             Text("\u22EE", color = Color.White, style = MaterialTheme.typography.titleMedium)
         }
