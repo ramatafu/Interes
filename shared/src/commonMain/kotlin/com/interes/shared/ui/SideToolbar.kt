@@ -119,25 +119,21 @@ fun SideToolbar(
 
 /**
  * Группа кнопок "Домой / Создать доску / Резервная копия / О программе" —
- * вынесена отдельным composable, потому что рисуется в ДВУХ разных местах
- * на разных платформах:
- * - Desktop: внутри SideToolbar выше, вертикальной Column, кнопками
- *   64.dp (ToolbarIconButton) — compact = false;
- * - Android: в верхнем тулбаре (AppRoot.kt), горизонтальным Row, компактными
- *   глифами 40.dp (TopBarGlyph, тот же стиль, что у значка поиска рядом) —
- *   compact = true.
+ * используется ТОЛЬКО на Desktop теперь (внутри SideToolbar выше,
+ * вертикальной Column, кнопками 64.dp — compact = false). На Android эти
+ * четыре кнопки разъехались по разным местам (см. AppRoot.kt/
+ * BoardsListScreen.kt): "Домой" убрана совсем, "Создать доску" — в нижнюю
+ * панель рядом с "О программе", "Резервная копия" — в нижнюю панель рядом
+ * с "Корзиной", "О программе" — в правый тулбар. Поэтому саму эту функцию
+ * там больше не вызывают — вместо неё используются CreateBoardButton,
+ * BackupButton и AboutButton по отдельности.
  *
- * includeInfo — включает ли эта группа ещё и кнопку "О программе" (см.
- * AboutButton ниже). По умолчанию true — это сохраняет Desktop БЕЗ
- * изменений (там "О программе" как была четвёртой кнопкой в этой же
- * колонке, так и осталась). На Android теперь false — "О программе"
- * переехала отдельно в правый тулбар, на уровень корзины (см.
- * RightToolbar.kt, AboutButton вызывается там напрямую), поэтому здесь,
- * в верхнем тулбаре, её быть не должно — иначе была бы в двух местах сразу.
+ * includeInfo — включает ли эта группа ещё и кнопку "О программе". По
+ * умолчанию true (Desktop, без изменений).
  *
  * Сама функция не оборачивает кнопки в Row/Column — это делает вызывающая
- * сторона (см. выше и AppRoot.kt), поэтому её можно вставить и в
- * вертикальный, и в горизонтальный контейнер без изменений.
+ * сторона (см. выше), поэтому её можно вставить и в вертикальный, и в
+ * горизонтальный контейнер без изменений.
  */
 @Composable
 fun PrimaryActionButtons(
@@ -147,6 +143,44 @@ fun PrimaryActionButtons(
     compact: Boolean,
     includeInfo: Boolean = true
 ) {
+    if (compact) {
+        TopBarGlyph(onClick = onHome) { HomeGlyph() }
+    } else {
+        ToolbarIconButton(contentDescription = "Домой", onClick = onHome) { HomeGlyph() }
+    }
+    CreateBoardButton(onCreateBoard = onCreateBoard, compact = compact)
+    BackupButton(backupPaths = backupPaths, compact = compact)
+    if (includeInfo) {
+        AboutButton(compact = compact)
+    }
+}
+
+/**
+ * Кнопка "Создать доску" (глиф "+"). Вынесена отдельно от
+ * PrimaryActionButtons — на Android она теперь стоит не рядом с Домой/
+ * Резервной копией, а в нижней панели рядом с "О программе" (см.
+ * BoardsListScreen.kt). На Desktop по-прежнему вызывается изнутри
+ * PrimaryActionButtons.
+ */
+@Composable
+fun CreateBoardButton(onCreateBoard: () -> Unit, compact: Boolean) {
+    if (compact) {
+        TopBarGlyph(onClick = onCreateBoard) { PlusGlyph() }
+    } else {
+        ToolbarIconButton(contentDescription = "Создать доску", onClick = onCreateBoard) { PlusGlyph() }
+    }
+}
+
+/**
+ * Кнопка "Резервная копия" (глиф) + её выпадающее меню ("Создать" /
+ * "Восстановить") и диалог результата — самодостаточна, со своим
+ * состоянием, как AboutButton. Вынесена отдельно от PrimaryActionButtons —
+ * на Android она теперь стоит не рядом с Домой/Создать доску, а в нижней
+ * панели рядом с "Корзиной" (см. BoardsListScreen.kt). На Desktop
+ * по-прежнему вызывается изнутри PrimaryActionButtons.
+ */
+@Composable
+fun BackupButton(backupPaths: BackupPaths, compact: Boolean) {
     var backupMenuExpanded by remember { mutableStateOf(false) }
     var backupResultMessage by remember { mutableStateOf<String?>(null) }
     var backupResultIsError by remember { mutableStateOf(false) }
@@ -166,20 +200,12 @@ fun PrimaryActionButtons(
         )
     }
 
-    @Composable
-    fun ActionButton(contentDescription: String, onClick: () -> Unit, glyph: @Composable () -> Unit) {
-        if (compact) {
-            TopBarGlyph(onClick = onClick, content = glyph)
-        } else {
-            ToolbarIconButton(contentDescription = contentDescription, onClick = onClick, content = glyph)
-        }
-    }
-
-    ActionButton("Домой", onHome) { HomeGlyph() }
-    ActionButton("Создать доску", onCreateBoard) { PlusGlyph() }
-
     Box {
-        ActionButton("Резервная копия", { backupMenuExpanded = true }) { BackupGlyph() }
+        if (compact) {
+            TopBarGlyph(onClick = { backupMenuExpanded = true }) { BackupGlyph() }
+        } else {
+            ToolbarIconButton(contentDescription = "Резервная копия", onClick = { backupMenuExpanded = true }) { BackupGlyph() }
+        }
         DropdownMenu(expanded = backupMenuExpanded, onDismissRequest = { backupMenuExpanded = false }) {
             DropdownMenuItem(
                 text = { Text("Создать резервную копию") },
@@ -196,10 +222,6 @@ fun PrimaryActionButtons(
                 }
             )
         }
-    }
-
-    if (includeInfo) {
-        AboutButton(compact = compact)
     }
 
     backupResultMessage?.let { message ->

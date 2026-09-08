@@ -58,6 +58,7 @@ import com.interes.shared.generated.resources.Res
 import com.interes.shared.generated.resources.board_placeholder
 import com.interes.shared.model.BoardSummary
 import com.interes.shared.repository.BoardRepository
+import com.interes.shared.storage.BackupPaths
 import com.interes.shared.util.localFilePathToUri
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
@@ -106,7 +107,11 @@ fun BoardsListScreen(
     // hideSideBarsOnHome в AppRoot.kt), и корзина переезжает сюда. На
     // Desktop этот колбэк передаётся, но не используется — там корзина
     // по-прежнему в SideToolbar.kt.
-    onOpenTrash: () -> Unit
+    onOpenTrash: () -> Unit,
+    // "Резервная копия" в нижней панели — тоже только на Android, рядом с
+    // "Корзиной" (см. bottomBar ниже). На Desktop не используется — там
+    // кнопка по-прежнему в SideToolbar.kt.
+    backupPaths: BackupPaths
 ) {
     val scope = rememberCoroutineScope()
 
@@ -137,8 +142,10 @@ fun BoardsListScreen(
             // чтобы сетка досок ниже не пряталась под настоящей панелью.
             Spacer(modifier = Modifier.fillMaxWidth().height(TopToolbarHeight))
         },
-        // FloatingActionButton "+" убран — дублировал значок "+" на левом
-        // тулбаре (SideToolbar.kt), который вызывает тот же onCreateBoard.
+        // FloatingActionButton "+" убран — на Android "Создать доску"
+        // теперь в нижней панели (см. bottomBar ниже), на Desktop — в
+        // левом тулбаре (SideToolbar.kt), который вызывает тот же
+        // onCreateBoard.
         bottomBar = {
             // Статистика — по ВСЕМ доскам, не только по видимым после
             // поиска: это общая сводка по приложению, а не по результатам
@@ -159,18 +166,29 @@ fun BoardsListScreen(
                 BottomAppBar(containerColor = Color.Transparent) {
                     val countText = "${boards.size} ${boardsWord(boards.size)} • $totalPhotos ${photosWord(totalPhotos)}"
                     if (nativeWindowController.primaryActionsInTopBar) {
-                        // Android: "Корзина" слева, счётчик по центру, "О
-                        // программе" справа — SideToolbar/RightToolbar на
-                        // этом экране не рисуются (см. hideSideBarsOnHome в
-                        // AppRoot.kt), эти две кнопки живут только здесь.
+                        // Android: "Корзина" + "Резервная копия" слева,
+                        // счётчик по центру, "Создать доску" + "О программе"
+                        // справа — SideToolbar/RightToolbar на этом экране
+                        // не рисуются (см. hideSideBars в AppRoot.kt), все
+                        // четыре кнопки живут только здесь. "Домой" из
+                        // верхнего тулбара убрана совсем — на Android её
+                        // больше нет нигде.
                         Row(
                             modifier = Modifier.fillMaxWidth(),
+                            // SpaceEvenly — равные промежутки МЕЖДУ ВСЕМИ
+                            // пятью элементами подряд. Из-за этого
+                            // "Резервная копия" оказывается ровно посередине
+                            // между "Корзиной" и счётчиком (промежуток
+                            // Корзина-Копия == промежуток Копия-счётчик), и
+                            // симметрично "Создать доску" — ровно посередине
+                            // между счётчиком и "О программе".
+                            horizontalArrangement = Arrangement.SpaceEvenly,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             TopBarGlyph(onClick = onOpenTrash) { TrashGlyph() }
-                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                                Text(countText, color = Color.White, style = MaterialTheme.typography.bodyMedium)
-                            }
+                            BackupButton(backupPaths = backupPaths, compact = true)
+                            Text(countText, color = Color.White, style = MaterialTheme.typography.bodyMedium)
+                            CreateBoardButton(onCreateBoard = onCreateBoard, compact = true)
                             AboutButton(compact = true)
                         }
                     } else {

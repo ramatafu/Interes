@@ -258,7 +258,10 @@ fun InteresRoot(
                                     // bottomBar в BoardsListScreen.kt): там
                                     // SideToolbar на главном экране не
                                     // рисуется, и корзина переезжает сюда.
-                                    onOpenTrash = { showTrash = true }
+                                    onOpenTrash = { showTrash = true },
+                                    // "Резервная копия" — тоже туда, рядом с
+                                    // "Корзиной" (см. bottomBar ниже).
+                                    backupPaths = backupPaths
                                 )
                             } else {
                                 val currentTitle = allBoards.firstOrNull { it.id == boardId }?.title
@@ -489,38 +492,13 @@ fun InteresRoot(
                                 WindowControlButtons(nativeWindowController = nativeWindowController, onClose = onExitApp)
                             }
                         }
-
-                        // "Домой/Создать доску/Резервная копия" — РАВНОМЕРНО
-                        // распределены В ПРОМЕЖУТКЕ между значком приложения
-                        // (заканчивается на ToolbarWidth от левого края) и
-                        // лупой (TopBarGlyph, 40.dp, у самого правого края) —
-                        // отступы start/end этого Row обрезают его ровно до
-                        // этого промежутка, а SpaceEvenly делит его на равные
-                        // доли (равный зазор до первой кнопки, между кнопками
-                        // и после последней). Только на Android
-                        // (primaryActionsInTopBar == true); на Desktop эта
-                        // группа остаётся в SideToolbar.kt.
-                        if (nativeWindowController.primaryActionsInTopBar) {
-                            Row(
-                                modifier = Modifier
-                                    .align(Alignment.CenterStart)
-                                    .fillMaxWidth()
-                                    .padding(start = toolbarWidth, end = 40.dp),
-                                horizontalArrangement = Arrangement.SpaceEvenly,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                PrimaryActionButtons(
-                                    onHome = goHome,
-                                    onCreateBoard = { showCreateBoardDialog = true },
-                                    backupPaths = backupPaths,
-                                    compact = true,
-                                    // "О программе" сюда не переезжает — она
-                                    // в правом тулбаре, на уровне корзины
-                                    // (см. RightToolbar, showAboutButton).
-                                    includeInfo = false
-                                )
-                            }
-                        }
+                        // "Домой/Создать доску/Резервная копия" здесь больше
+                        // НЕ рисуются: "Домой" убрана совсем (по просьбе),
+                        // "Создать доску" переехала в нижнюю панель
+                        // BoardsListScreen.kt рядом с "О программе", а
+                        // "Резервная копия" — туда же, рядом с "Корзиной".
+                        // На Desktop эта группа остаётся, как и была, в
+                        // SideToolbar.kt (PrimaryActionButtons).
                     }
                 }
             } else {
