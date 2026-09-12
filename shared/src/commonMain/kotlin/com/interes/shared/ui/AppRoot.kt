@@ -155,13 +155,17 @@ fun InteresRoot(
             // nativeWindowController.showOpacitySlider ниже) — от
             // SideToolbar/RightToolbar никак не зависит.
             //
-            // Боковые тулбары остаются ТОЛЬКО в корзине (её пока не
-            // трогали) — единственный экран, где hideSideBars всё ещё
-            // false на Android. На Desktop primaryActionsInTopBar всегда
-            // false — там hideSideBars всегда false, ничего не меняется ни
-            // на одном экране.
+            // Боковые тулбары раньше оставались ТОЛЬКО в корзине — теперь
+            // тоже скрыты на Android, по той же схеме, что и на остальных
+            // экранах: у TrashScreen.kt уже есть собственные верхний и
+            // нижний тулбары на всю ширину, а SideToolbar/RightToolbar там
+            // дублировали её же кнопки (значок корзины/домой слева, "О
+            // программе" справа) в узкой, по сути ничем не занятой полосе
+            // по бокам. На Desktop primaryActionsInTopBar всегда false —
+            // там hideSideBars всегда false, ничего не меняется ни на одном
+            // экране.
             val isHomeScreen = !showTrash && selectedBoardId == null
-            val hideSideBars = nativeWindowController.primaryActionsInTopBar && !showTrash
+            val hideSideBars = nativeWindowController.primaryActionsInTopBar
 
 
             // pagerState поднят сюда: доступен и контенту, и лямбдам тулбаров.
@@ -331,11 +335,11 @@ fun InteresRoot(
                 }
             }
 
-            // Левый тулбар со стрелкой ◀. На Android не рисуется, пока
-            // hideSideBars (главный экран, экран доски и просмотр фото) —
-            // "Корзина" переехала в нижнюю панель BoardsListScreen.kt, а
-            // "Домой/+/Резервная копия" и так уже в верхнем тулбаре. Только
-            // в корзине — рисуется как обычно.
+            // Левый тулбар со стрелкой ◀. На Android не рисуется вообще —
+            // ни на главном экране, ни на экране доски/просмотра фото, ни
+            // теперь в корзине: "Корзина" переехала в нижнюю панель
+            // BoardsListScreen.kt, а "Домой/+/Резервная копия" и так уже в
+            // верхнем тулбаре. Рисуется только на Desktop.
             if (!hideSideBars) {
                 SideToolbar(
                     modifier = Modifier.fillMaxHeight().align(Alignment.CenterStart),
@@ -358,10 +362,10 @@ fun InteresRoot(
             // Правый тулбар: кнопка "Добавить фото" (на Android не нужна —
             // она теперь в верхней панели самой доски, см.
             // showAddPhotoInTopBar в BoardScreen.kt), стрелка ▶ +
-            // вертикальный ползунок прозрачности. На Android не рисуется,
-            // пока hideSideBars — "О программе" переехала в нижнюю панель
-            // BoardsListScreen.kt. На Desktop рисуется как обычно на всех
-            // экранах.
+            // вертикальный ползунок прозрачности. На Android не рисуется
+            // вообще (ни на одном экране, включая корзину) — "О программе"
+            // переехала в нижнюю панель BoardsListScreen.kt. На Desktop
+            // рисуется как обычно на всех экранах.
             if (!hideSideBars) {
                 RightToolbar(
                     modifier = Modifier.fillMaxHeight().align(Alignment.CenterEnd),

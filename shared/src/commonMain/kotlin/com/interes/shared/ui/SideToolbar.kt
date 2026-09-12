@@ -1,6 +1,7 @@
 package com.interes.shared.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.interes.shared.storage.BackupPaths
@@ -237,13 +239,13 @@ fun BackupButton(backupPaths: BackupPaths, compact: Boolean) {
 }
 
 /**
- * Кнопка "О программе" (глиф "!") + сам диалог с информацией о версии и
- * лицензии. Вынесена ОТДЕЛЬНО от PrimaryActionButtons (Домой/+/Резервная
- * копия), потому что на Android она теперь стоит не рядом с ними, а в
- * правом тулбаре на уровень корзины (см. RightToolbar.kt) — на Desktop же
- * по-прежнему вызывается ИЗНУТРИ PrimaryActionButtons (includeInfo = true
- * по умолчанию), то есть остаётся четвёртой кнопкой в той же колонке, что
- * и раньше.
+ * Кнопка "О программе" (глиф "!") + сам диалог с информацией о версии,
+ * описанием, авторами и лицензией. Вынесена ОТДЕЛЬНО от PrimaryActionButtons
+ * (Домой/+/Резервная копия), потому что на Android она теперь стоит не
+ * рядом с ними, а в правом тулбаре на уровень корзины (см. RightToolbar.kt)
+ * — на Desktop же по-прежнему вызывается ИЗНУТРИ PrimaryActionButtons
+ * (includeInfo = true по умолчанию), то есть остаётся четвёртой кнопкой в
+ * той же колонке, что и раньше.
  */
 @Composable
 fun AboutButton(compact: Boolean) {
@@ -256,16 +258,50 @@ fun AboutButton(compact: Boolean) {
     }
 
     if (showInfoDialog) {
+        val uriHandler = LocalUriHandler.current
+        val repoUrl = "https://github.com/ramatafu/Interes"
+
         AlertDialog(
             onDismissRequest = { showInfoDialog = false },
             title = { Text("Interes") },
             text = {
                 Column {
-                    Text("Версия 0.1.0", style = MaterialTheme.typography.bodyMedium)
+                    Text("Версия 0.2.6", style = MaterialTheme.typography.bodyMedium)
                     Text(
-                        "Приложение для досок визуализации: собирайте и организуйте фотографии по темам и категориям.",
+                        "Оффлайн-приложение для досок визуализации: собирайте и организуйте фотографии по темам и категориям.",
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(top = 8.dp)
+                    )
+                    Text(
+                        "Разработка:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 12.dp)
+                    )
+                    Text(
+                        "Идея, дизайн, тестирование: ram",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                    Text(
+                        "Генерация кода: Claude Code (Anthropic)",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                    Text(
+                        "Консультация: DeepSeek",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                    // Кликабельная ссылка на репозиторий — LocalUriHandler
+                    // общий для Compose Multiplatform (свой actual на
+                    // Android/Desktop), открывает системный браузер.
+                    Text(
+                        repoUrl,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .padding(top = 12.dp)
+                            .clickable { uriHandler.openUri(repoUrl) }
                     )
                     Text(
                         "Лицензия: GNU General Public License v3.0 (GPLv3).",

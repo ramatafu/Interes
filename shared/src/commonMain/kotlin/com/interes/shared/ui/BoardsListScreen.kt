@@ -46,6 +46,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -152,49 +153,56 @@ fun BoardsListScreen(
             // фильтра. BottomAppBar, а не просто Text с отступом снизу —
             // тут же и фон/эффект приподнятости, бесплатно, без лишней
             // разметки.
-            if (boards.isNotEmpty()) {
-                val totalPhotos = boards.sumOf { it.photoCount }
-                // containerColor = Color.Transparent — а не ToolbarBackgroundColor
-                // ещё раз: фон ВСЕГО Scaffold (см. containerColor выше) уже
-                // покрывает эту область полупрозрачным цветом. Если покрасить
-                // BottomAppBar своим ТАКИМ ЖЕ 93%-прозрачным цветом поверх —
-                // два одинаковых полупрозрачных слоя друг на друге почти
-                // складываются до непрозрачности (0.93×0.93 ≈ 99.5% непрозрачно)
-                // и нижняя панель визуально выглядит сплошной, в отличие от
-                // остального фона. Transparent здесь даёт ОДИН слой прозрачности
-                // на весь экран — как и должно быть.
-                BottomAppBar(containerColor = Color.Transparent) {
-                    val countText = "${boards.size} ${boardsWord(boards.size)} • $totalPhotos ${photosWord(totalPhotos)}"
-                    if (nativeWindowController.primaryActionsInTopBar) {
-                        // Android: "Корзина" + "Резервная копия" слева,
-                        // счётчик по центру, "Создать доску" + "О программе"
-                        // справа — SideToolbar/RightToolbar на этом экране
-                        // не рисуются (см. hideSideBars в AppRoot.kt), все
-                        // четыре кнопки живут только здесь. "Домой" из
-                        // верхнего тулбара убрана совсем — на Android её
-                        // больше нет нигде.
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            // SpaceEvenly — равные промежутки МЕЖДУ ВСЕМИ
-                            // пятью элементами подряд. Из-за этого
-                            // "Резервная копия" оказывается ровно посередине
-                            // между "Корзиной" и счётчиком (промежуток
-                            // Корзина-Копия == промежуток Копия-счётчик), и
-                            // симметрично "Создать доску" — ровно посередине
-                            // между счётчиком и "О программе".
-                            horizontalArrangement = Arrangement.SpaceEvenly,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            TopBarGlyph(onClick = onOpenTrash) { TrashGlyph() }
-                            BackupButton(backupPaths = backupPaths, compact = true)
-                            Text(countText, color = Color.White, style = MaterialTheme.typography.bodyMedium)
-                            CreateBoardButton(onCreateBoard = onCreateBoard, compact = true)
-                            AboutButton(compact = true)
-                        }
-                    } else {
-                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            Text(countText, color = Color.White, style = MaterialTheme.typography.bodyMedium)
-                        }
+            //
+            // Панель рисуется ВСЕГДА, даже когда boards пуст (после
+            // удаления последней доски) — раньше здесь было условие
+            // if (boards.isNotEmpty()), из-за которого на Android вместе с
+            // панелью пропадали "Корзина", "Резервная копия", "О
+            // программе" и "Создать доску": пустой список досок не должен
+            // отрезать доступ к этим кнопкам, счётчик просто показывает
+            // "0 досок • 0 фото".
+            val totalPhotos = boards.sumOf { it.photoCount }
+            // containerColor = Color.Transparent — а не ToolbarBackgroundColor
+            // ещё раз: фон ВСЕГО Scaffold (см. containerColor выше) уже
+            // покрывает эту область полупрозрачным цветом. Если покрасить
+            // BottomAppBar своим ТАКИМ ЖЕ 93%-прозрачным цветом поверх —
+            // два одинаковых полупрозрачных слоя друг на друге почти
+            // складываются до непрозрачности (0.93×0.93 ≈ 99.5% непрозрачно)
+            // и нижняя панель визуально выглядит сплошной, в отличие от
+            // остального фона. Transparent здесь даёт ОДИН слой прозрачности
+            // на весь экран — как и должно быть.
+            BottomAppBar(containerColor = Color.Transparent) {
+                val countText = "${boards.size} ${boardsWord(boards.size)} • $totalPhotos ${photosWord(totalPhotos)}"
+                if (nativeWindowController.primaryActionsInTopBar) {
+                    // Android: "Корзина" + "Резервная копия" слева,
+                    // счётчик по центру, "О программе" + "Создать доску"
+                    // справа — SideToolbar/RightToolbar на этом экране
+                    // не рисуются (см. hideSideBars в AppRoot.kt), все
+                    // четыре кнопки живут только здесь. "Домой" из
+                    // верхнего тулбара убрана совсем — на Android её
+                    // больше нет нигде.
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        // SpaceEvenly — равные промежутки МЕЖДУ ВСЕМИ
+                        // пятью элементами подряд. Из-за этого
+                        // "Резервная копия" оказывается ровно посередине
+                        // между "Корзиной" и счётчиком (промежуток
+                        // Корзина-Копия == промежуток Копия-счётчик), и
+                        // симметрично "О программе" — ровно посередине
+                        // между счётчиком и "Создать доску" (крайняя
+                        // правая кнопка).
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TopBarGlyph(onClick = onOpenTrash) { TrashGlyph() }
+                        BackupButton(backupPaths = backupPaths, compact = true)
+                        Text(countText, color = Color.White, style = MaterialTheme.typography.bodyMedium)
+                        AboutButton(compact = true)
+                        CreateBoardButton(onCreateBoard = onCreateBoard, compact = true)
+                    }
+                } else {
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Text(countText, color = Color.White, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
@@ -205,7 +213,15 @@ fun BoardsListScreen(
                 modifier = Modifier.fillMaxSize().padding(padding),
                 contentAlignment = Alignment.Center
             ) {
-                Text("Пока нет ни одной доски — нажмите \"+\", чтобы создать первую")
+                // textAlign = Center — Box уже центрирует сам Text как блок,
+                // но при переносе на несколько строк каждая строка внутри
+                // него по умолчанию прижата к левому краю; textAlign
+                // выравнивает уже сам текст внутри строк.
+                Text(
+                    "Пока нет ни одной доски — нажмите \"+\", чтобы создать первую",
+                    color = Color.White,
+                    textAlign = TextAlign.Center
+                )
             }
         } else if (visibleBoards.isEmpty()) {
             Box(
