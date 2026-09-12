@@ -1,5 +1,6 @@
 package com.interes.shared.ui
 
+import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
@@ -28,7 +29,7 @@ actual fun rememberBackupCreator(paths: BackupPaths, onResult: (Result<Unit>) ->
         val result = BackupManager.createBackup(paths, tempFile.absolutePath).mapCatching {
             context.contentResolver.openOutputStream(uri)?.use { out ->
                 tempFile.inputStream().use { it.copyTo(out) }
-            } ?: error("Не удалось открыть выбранное место для сохранения")
+            } ?: error("Failed to open the selected save location")
             Unit
         }
         tempFile.delete()
@@ -52,7 +53,7 @@ actual fun rememberBackupRestorer(paths: BackupPaths, onResult: (Result<Unit>) -
         val result = runCatching {
             context.contentResolver.openInputStream(uri)?.use { input ->
                 tempFile.outputStream().use { input.copyTo(it) }
-            } ?: error("Не удалось открыть выбранный файл резервной копии")
+            } ?: error("Failed to open the selected backup file")
         }.mapCatching {
             BackupManager.restoreBackup(paths, tempFile.absolutePath).getOrThrow()
         }
@@ -60,4 +61,28 @@ actual fun rememberBackupRestorer(paths: BackupPaths, onResult: (Result<Unit>) -
         onResult(result)
     }
     return { launcher.launch(arrayOf("application/zip")) }
+}
+
+@Composable
+actual fun rememberAppRestarter(): () -> Unit {
+    val context = LocalContext.current
+    return {
+        // getLaunchIntentForPackage — тот же Intent, что и запуск с иконки
+        // на рабочем столе. FLAG_ACTIVITY_NEW_TASK обязателен при запуске
+        // Activity вне контекста другой Activity (здесь это applicationContext,
+        // а не сама MainActivity — вызывается уже после того, как процесс
+        // может быть убит). FLAG_ACTIVITY_CLEAR_TASK стирает весь старый
+        // task целиком, а не просто добавляет ещё одну Activity поверх —
+        // без него могла бы вернуться СТАРАЯ, уже открытая MainActivity
+        // вместо создания новой (см. doc-комментарий в BackupActions.kt).
+        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+        intent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        if (intent != null) context.startActivity(intent)
+        // Убиваем ТЕКУЩИЙ процесс ПОСЛЕ старта нового Intent (система уже
+        // приняла его в очередь) — только так гарантированно пересоздаётся
+        // repository (by lazy в MainActivity) с открытием уже
+        // восстановленного файла БД, а не разворачивается старое,
+        // кэшированное соединение.
+        android.os.Process.killProcess(android.os.Process.myPid())
+    }
 }

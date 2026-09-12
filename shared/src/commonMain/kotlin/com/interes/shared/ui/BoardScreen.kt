@@ -60,6 +60,10 @@ fun BoardScreen(
     val photos by photosFlow.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    // Захвачен здесь (тело composable-функции) — колбэк rememberImagePicker
+    // ниже выполняется уже вне композиции (после закрытия системного
+    // диалога выбора файлов), там LocalAppLanguage.current недоступен.
+    val language = LocalAppLanguage.current
 
     // Фото, для которого долгим нажатием попросили меню действий —
     // сейчас единственное действие тут "удалить", поэтому сразу диалог
@@ -86,8 +90,7 @@ fun BoardScreen(
                 }
             }
             if (failed > 0) {
-                val word = if (failed == 1) "файл" else "файла"
-                snackbarHostState.showSnackbar("Не удалось добавить $failed $word — подробности в консоли")
+                snackbarHostState.showSnackbar(language.addPhotosFailed(failed))
             }
         }
     }
@@ -167,19 +170,19 @@ fun BoardScreen(
     photoPendingDelete?.let { photo ->
         AlertDialog(
             onDismissRequest = { photoPendingDelete = null },
-            title = { Text("Удалить фото?") },
-            text = { Text("Фото будет удалено с доски безвозвратно.") },
+            title = { Text(language.deletePhotoTitle()) },
+            text = { Text(language.deletePhotoText()) },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch { repository.deletePhoto(photo) }
                     photoPendingDelete = null
                 }) {
-                    Text("Удалить")
+                    Text(language.delete())
                 }
             },
             dismissButton = {
                 TextButton(onClick = { photoPendingDelete = null }) {
-                    Text("Отмена")
+                    Text(language.cancel())
                 }
             }
         )

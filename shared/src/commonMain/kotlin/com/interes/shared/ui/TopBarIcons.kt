@@ -259,6 +259,40 @@ fun ChevronRightGlyph(
     }
 }
 
+/**
+ * Глобус — переключатель языка (LanguageButton в SideToolbar.kt). Та же
+ * техника, что и у остальных значков этого файла: тонкие линии через
+ * Canvas, без иконочных шрифтов. Внешний круг + один "меридиан" (узкий
+ * эллипс) + "экватor" (горизонтальная линия) — минимально достаточный
+ * узнаваемый силуэт глобуса без прорисовки полного глобуса с параллелями.
+ */
+@Composable
+fun LanguageGlyph(
+    modifier: Modifier = Modifier,
+    size: Dp = 22.dp,
+    color: Color = Color.White,
+    strokeWidth: Dp = 1.6.dp
+) {
+    Canvas(modifier = modifier.size(size)) {
+        val stroke = strokeWidth.toPx()
+        val radius = (this.size.minDimension - stroke) / 2f
+        val center = Offset(this.size.width / 2f, this.size.height / 2f)
+        drawCircle(color = color, radius = radius, center = center, style = Stroke(width = stroke))
+        drawLine(
+            color = color,
+            start = Offset(center.x - radius, center.y),
+            end = Offset(center.x + radius, center.y),
+            strokeWidth = stroke
+        )
+        drawOval(
+            color = color,
+            topLeft = Offset(center.x - radius * 0.42f, center.y - radius),
+            size = Size(radius * 0.84f, radius * 2f),
+            style = Stroke(width = stroke)
+        )
+    }
+}
+
 @Composable
 fun TrashGlyph(
     modifier: Modifier = Modifier,

@@ -22,6 +22,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -50,9 +51,17 @@ fun InteresRoot(
     repository: BoardRepository,
     backupPaths: BackupPaths,
     nativeWindowController: NativeWindowController,
+    languageStorage: AppLanguageStorage,
     onExitApp: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
+
+    // Язык интерфейса — загружается один раз при первой композиции (см.
+    // AppLanguageStorage.load()/save() в AppLanguage.kt) и живёт здесь же,
+    // в самом корне: и значение (LocalAppLanguage), и функция изменения
+    // (LocalAppLanguageSetter, читается LanguageButton в SideToolbar.kt)
+    // передаются вниз через CompositionLocalProvider ниже.
+    var appLanguage by remember { mutableStateOf(languageStorage.load()) }
 
     val boardSummariesFlow = remember(repository) { repository.observeBoardSummaries() }
     val allBoardsFlow = remember(repository) { repository.observeBoards() }
@@ -122,6 +131,13 @@ fun InteresRoot(
     }
 
     InteresTheme {
+        CompositionLocalProvider(
+            LocalAppLanguage provides appLanguage,
+            LocalAppLanguageSetter provides { newLanguage ->
+                appLanguage = newLanguage
+                languageStorage.save(newLanguage)
+            }
+        ) {
         Box(modifier = Modifier.fillMaxSize()) {
             // Ширина боковых колонок — 72.dp на Desktop (как и раньше,
             // ToolbarWidth/RightToolbarWidth), 48.dp на Android (см. doc в
@@ -422,23 +438,37 @@ fun InteresRoot(
                     // а не Row, прижатый к самому левому краю окна. Название
                     // "Interes" рядом с иконкой убрано — верхний тулбар
                     // теперь без текста. Скрыто в режиме поиска — там на
-                    // этом месте разворачивается поле поиска.
+                    // этом месте разворачивается поле поиска. Кликабелен:
+                    // открывает диалог "О программе" (см. showAboutDialog
+                    // ниже) — на Android это теперь единственный способ
+                    // открыть его с главного экрана, отдельной кнопки-
+                    // "!" в нижней панели больше нет (см. BoardsListScreen.kt).
                     if (!showSearchField) {
+                        // showAboutDialog — своё состояние прямо здесь: раньше
+                        // диалог "О программе" открывался отдельной кнопкой в
+                        // нижнем/боковом тулбаре (см. AboutButton в
+                        // SideToolbar.kt), теперь на главном экране Android
+                        // это делает клик по самому значку-логотипу "In" —
+                        // AboutDialog (тот же диалог, что и раньше) вынесен
+                        // отдельно от кнопки именно ради такого переиспользования.
+                        var showAboutDialog by remember { mutableStateOf(false) }
                         Box(
                             modifier = Modifier
                                 .align(Alignment.CenterStart)
                                 .width(toolbarWidth)
-                                .fillMaxHeight(),
+                                .fillMaxHeight()
+                                .clickable { showAboutDialog = true },
                             contentAlignment = Alignment.Center
                         ) {
                             Image(
                                 painter = painterResource(Res.drawable.app_icon),
-                                contentDescription = null,
+                                contentDescription = LocalAppLanguage.current.about(),
                                 modifier = Modifier
                                     .size(28.dp)
                                     .clip(RoundedCornerShape(6.dp))
                             )
                         }
+                        AboutDialog(show = showAboutDialog, onDismiss = { showAboutDialog = false })
                     }
 
                     if (showSearchField) {
@@ -450,7 +480,7 @@ fun InteresRoot(
                         OutlinedTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
-                            placeholder = { Text("Поиск доски...") },
+                            placeholder = { Text(LocalAppLanguage.current.searchPlaceholder()) },
                             leadingIcon = { SearchGlyph(color = MaterialTheme.colorScheme.onSurface) },
                             singleLine = true,
                             shape = RoundedCornerShape(50),
@@ -574,4 +604,5 @@ fun InteresRoot(
             )
         }
     }
+}
 }

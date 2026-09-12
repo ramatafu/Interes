@@ -9,7 +9,7 @@ import java.awt.Frame
 actual fun rememberImagePicker(onPicked: (List<String>) -> Unit): () -> Unit {
     return remember {
         {
-            val dialog = FileDialog(null as Frame?, "Выберите фото", FileDialog.LOAD)
+            val dialog = FileDialog(null as Frame?, "Choose photos", FileDialog.LOAD)
             dialog.isMultipleMode = true
             // FileDialog.setFilenameFilter официально не работает в
             // Windows-реализации AWT (см. javadoc самого метода: "Filename

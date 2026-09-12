@@ -115,6 +115,7 @@ fun BoardsListScreen(
     backupPaths: BackupPaths
 ) {
     val scope = rememberCoroutineScope()
+    val language = LocalAppLanguage.current
 
     // Доска, для которой долгим нажатием (или кнопкой "⋮") вызвали меню действий.
     var actionsFor by remember { mutableStateOf<BoardSummary?>(null) }
@@ -172,32 +173,30 @@ fun BoardsListScreen(
             // остального фона. Transparent здесь даёт ОДИН слой прозрачности
             // на весь экран — как и должно быть.
             BottomAppBar(containerColor = Color.Transparent) {
-                val countText = "${boards.size} ${boardsWord(boards.size)} • $totalPhotos ${photosWord(totalPhotos)}"
+                val countText = "${boards.size} ${language.boardsWord(boards.size)} • $totalPhotos ${language.photosWord(totalPhotos)}"
                 if (nativeWindowController.primaryActionsInTopBar) {
                     // Android: "Корзина" + "Резервная копия" слева,
-                    // счётчик по центру, "О программе" + "Создать доску"
-                    // справа — SideToolbar/RightToolbar на этом экране
-                    // не рисуются (см. hideSideBars в AppRoot.kt), все
-                    // четыре кнопки живут только здесь. "Домой" из
-                    // верхнего тулбара убрана совсем — на Android её
-                    // больше нет нигде.
+                    // счётчик по центру, переключатель языка + "Создать
+                    // доску" справа. "О программе" отсюда убрана — теперь
+                    // это клик по значку-логотипу "In" в верхнем тулбаре
+                    // (см. AppRoot.kt), а не отдельная кнопка здесь.
+                    // SideToolbar/RightToolbar на этом экране не рисуются
+                    // (см. hideSideBars в AppRoot.kt). "Домой" из верхнего
+                    // тулбара убрана совсем — на Android её больше нет
+                    // нигде.
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        // SpaceEvenly — равные промежутки МЕЖДУ ВСЕМИ
-                        // пятью элементами подряд. Из-за этого
-                        // "Резервная копия" оказывается ровно посередине
-                        // между "Корзиной" и счётчиком (промежуток
-                        // Корзина-Копия == промежуток Копия-счётчик), и
-                        // симметрично "О программе" — ровно посередине
-                        // между счётчиком и "Создать доску" (крайняя
-                        // правая кнопка).
+                        // SpaceEvenly — равные промежутки между всеми
+                        // пятью элементами подряд, простое и предсказуемое
+                        // распределение вместо ручной расстановки Spacer'ов
+                        // под конкретное число кнопок.
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         TopBarGlyph(onClick = onOpenTrash) { TrashGlyph() }
                         BackupButton(backupPaths = backupPaths, compact = true)
                         Text(countText, color = Color.White, style = MaterialTheme.typography.bodyMedium)
-                        AboutButton(compact = true)
+                        LanguageButton(compact = true)
                         CreateBoardButton(onCreateBoard = onCreateBoard, compact = true)
                     }
                 } else {
@@ -218,7 +217,7 @@ fun BoardsListScreen(
                 // него по умолчанию прижата к левому краю; textAlign
                 // выравнивает уже сам текст внутри строк.
                 Text(
-                    "Пока нет ни одной доски — нажмите \"+\", чтобы создать первую",
+                    language.noBoardsYet(),
                     color = Color.White,
                     textAlign = TextAlign.Center
                 )
@@ -228,7 +227,7 @@ fun BoardsListScreen(
                 modifier = Modifier.fillMaxSize().padding(padding),
                 contentAlignment = Alignment.Center
             ) {
-                Text("Ничего не найдено по запросу \"$searchQuery\"")
+                Text(language.noSearchResults(searchQuery))
             }
         } else {
             // На Android (fixedBoardGridColumns != null, см. doc в
@@ -307,16 +306,16 @@ fun BoardsListScreen(
                     TextButton(onClick = {
                         renamingBoard = board
                         actionsFor = null
-                    }) { Text("Переименовать") }
+                    }) { Text(language.rename()) }
                     TextButton(onClick = {
                         deletingBoard = board
                         actionsFor = null
-                    }) { Text("Удалить", color = MaterialTheme.colorScheme.error) }
+                    }) { Text(language.delete(), color = MaterialTheme.colorScheme.error) }
                 }
             },
             confirmButton = {},
             dismissButton = {
-                TextButton(onClick = { actionsFor = null }) { Text("Отмена") }
+                TextButton(onClick = { actionsFor = null }) { Text(language.cancel()) }
             }
         )
     }
@@ -335,16 +334,16 @@ fun BoardsListScreen(
     deletingBoard?.let { board ->
         AlertDialog(
             onDismissRequest = { deletingBoard = null },
-            title = { Text("Удалить доску?") },
-            text = { Text("Доска \"${board.title}\" переместится в Корзину. Оттуда её можно будет восстановить или удалить навсегда.") },
+            title = { Text(language.deleteBoardTitle()) },
+            text = { Text(language.deleteBoardText(board.title)) },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch { repository.softDeleteBoard(board.id) }
                     deletingBoard = null
-                }) { Text("Удалить", color = MaterialTheme.colorScheme.error) }
+                }) { Text(language.delete(), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { deletingBoard = null }) { Text("Отмена") }
+                TextButton(onClick = { deletingBoard = null }) { Text(language.cancel()) }
             }
         )
     }
@@ -453,10 +452,7 @@ private fun BoardCard(
                 Row {
                     Text(board.category, color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall)
                     Text(
-                        // "фото" в русском не склоняется по числам (1 фото,
-                        // 2 фото, 5 фото — везде одна форма), поэтому без
-                        // отдельной логики множественного числа.
-                        " · ${board.photoCount} фото",
+                        " · ${board.photoCount} ${LocalAppLanguage.current.photosWord(board.photoCount)}",
                         color = Color.White.copy(alpha = 0.8f),
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -528,23 +524,24 @@ fun CreateBoardDialog(
 ) {
     var title by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("") }
+    val language = LocalAppLanguage.current
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Новая доска") },
+        title = { Text(language.newBoardDialogTitle()) },
         text = {
             Column {
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Название") },
+                    label = { Text(language.titleLabel()) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = category,
                     onValueChange = { category = it },
-                    label = { Text("Категория") },
+                    label = { Text(language.categoryLabel()) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                 )
@@ -553,11 +550,11 @@ fun CreateBoardDialog(
         confirmButton = {
             TextButton(
                 enabled = title.isNotBlank(),
-                onClick = { onCreate(title.trim(), category.trim().ifBlank { "Общее" }) }
-            ) { Text("Создать") }
+                onClick = { onCreate(title.trim(), category.trim().ifBlank { language.defaultCategory() }) }
+            ) { Text(language.create()) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Отмена") }
+            TextButton(onClick = onDismiss) { Text(language.cancel()) }
         }
     )
 }
@@ -569,10 +566,11 @@ private fun RenameBoardDialog(
     onConfirm: (String) -> Unit
 ) {
     var title by remember { mutableStateOf(currentTitle) }
+    val language = LocalAppLanguage.current
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Переименовать доску") },
+        title = { Text(language.renameBoardTitle()) },
         text = {
             OutlinedTextField(
                 value = title,
@@ -585,10 +583,10 @@ private fun RenameBoardDialog(
             TextButton(
                 enabled = title.isNotBlank(),
                 onClick = { onConfirm(title.trim()) }
-            ) { Text("Сохранить") }
+            ) { Text(language.save()) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Отмена") }
+            TextButton(onClick = onDismiss) { Text(language.cancel()) }
         }
     )
 }
@@ -615,20 +613,3 @@ private class AdaptiveMaxColumns(private val minSize: Dp, private val maxColumns
         return List(columns) { index -> if (index < remainder) cellSize + 1 else cellSize }
     }
 }
-
-// "доска" склоняется по числам (1 доска, 2 доски, 5 досок) — обычные
-// русские правила для одушевлённых/неодушевлённых существительных на -а.
-private fun boardsWord(count: Int): String {
-    val mod100 = count % 100
-    val mod10 = count % 10
-    return when {
-        mod100 in 11..14 -> "досок"
-        mod10 == 1 -> "доска"
-        mod10 in 2..4 -> "доски"
-        else -> "досок"
-    }
-}
-
-// "фото" НЕ склоняется в русском (1 фото, 2 фото, 5 фото — одна форма
-// всегда) — функция только ради симметрии с boardsWord в месте вызова.
-private fun photosWord(count: Int): String = "фото"

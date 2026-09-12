@@ -23,7 +23,7 @@ actual class PhotoFileStorage(private val context: Context) {
 
         context.contentResolver.openInputStream(uri)?.use { input ->
             destFile.outputStream().use { output -> input.copyTo(output) }
-        } ?: error("Не удалось открыть выбранное изображение: $sourcePath")
+        } ?: error("Failed to open the selected image: $sourcePath")
 
         // Декодируем только границы файла (inJustDecodeBounds), чтобы не
         // грузить всё изображение в память ради размеров.

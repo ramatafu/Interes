@@ -8,6 +8,7 @@ import java.awt.FileDialog
 import java.awt.Frame
 import java.text.SimpleDateFormat
 import java.util.Date
+import kotlin.system.exitProcess
 
 @Composable
 actual fun rememberBackupCreator(paths: BackupPaths, onResult: (Result<Unit>) -> Unit): () -> Unit {
@@ -19,7 +20,7 @@ actual fun rememberBackupCreator(paths: BackupPaths, onResult: (Result<Unit>) ->
     // корутину с состоянием загрузки — сознательно не усложняем сейчас.
     return remember(paths) {
         {
-            val dialog = FileDialog(null as Frame?, "Сохранить резервную копию", FileDialog.SAVE)
+            val dialog = FileDialog(null as Frame?, "Save backup", FileDialog.SAVE)
             val stamp = SimpleDateFormat("yyyy-MM-dd_HHmm").format(Date())
             dialog.file = "interes-backup-$stamp.zip"
             dialog.isVisible = true // блокирует поток до закрытия — как и в ImagePicker.desktop.kt
@@ -43,7 +44,7 @@ actual fun rememberBackupCreator(paths: BackupPaths, onResult: (Result<Unit>) ->
 actual fun rememberBackupRestorer(paths: BackupPaths, onResult: (Result<Unit>) -> Unit): () -> Unit {
     return remember(paths) {
         {
-            val dialog = FileDialog(null as Frame?, "Выберите файл резервной копии", FileDialog.LOAD)
+            val dialog = FileDialog(null as Frame?, "Choose a backup file", FileDialog.LOAD)
             // См. комментарий в ImagePicker.desktop.kt: setFilenameFilter не
             // работает на Windows, поэтому маска — через dialog.file.
             dialog.file = "*.zip"
@@ -55,4 +56,16 @@ actual fun rememberBackupRestorer(paths: BackupPaths, onResult: (Result<Unit>) -
             }
         }
     }
+}
+
+/**
+ * На Desktop, в отличие от Android, никакого трюка с перезапуском НЕ нужно —
+ * закрытие процесса JVM тут и так означает полное завершение приложения
+ * (см. doc-комментарий rememberAppRestarter в BackupActions.kt). Просто
+ * завершаем процесс: пользователь одним кликом получает тот же эффект, что
+ * раньше требовал вручную закрыть окно и заново открыть Interes.
+ */
+@Composable
+actual fun rememberAppRestarter(): () -> Unit = remember {
+    { exitProcess(0) }
 }

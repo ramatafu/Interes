@@ -64,6 +64,7 @@ fun TrashScreen(
 ) {
     val scope = rememberCoroutineScope()
     var confirmingDeleteBoard by remember { mutableStateOf<Board?>(null) }
+    val language = LocalAppLanguage.current
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Остальной тулбар — весь экран, с отступом сверху под верхнюю панель.
@@ -75,7 +76,7 @@ fun TrashScreen(
         ) {
             if (trashedBoards.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Корзина пуста", color = Color.White)
+                    Text(language.trashIsEmpty(), color = Color.White)
                 }
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -96,10 +97,10 @@ fun TrashScreen(
                                 Text(board.category, style = MaterialTheme.typography.bodySmall)
                             }
                             TextButton(onClick = { scope.launch { repository.restoreBoard(board.id) } }) {
-                                Text("Восстановить")
+                                Text(language.restore())
                             }
                             TextButton(onClick = { confirmingDeleteBoard = board }) {
-                                Text("Удалить навсегда", color = MaterialTheme.colorScheme.error)
+                                Text(language.deletePermanently(), color = MaterialTheme.colorScheme.error)
                             }
                         }
                         HorizontalDivider()
@@ -132,7 +133,7 @@ fun TrashScreen(
             }
             // windowDragHandle — см. тот же приём в BoardsListScreen.kt.
             Text(
-                "Корзина",
+                language.trash(),
                 style = MaterialTheme.typography.titleLarge,
                 color = Color.White,
                 modifier = Modifier.windowDragHandle(nativeWindowController)
@@ -143,16 +144,16 @@ fun TrashScreen(
     confirmingDeleteBoard?.let { board ->
         AlertDialog(
             onDismissRequest = { confirmingDeleteBoard = null },
-            title = { Text("Удалить навсегда?") },
-            text = { Text("Доска \"${board.title}\" и все фото на ней будут удалены безвозвратно. Отменить это будет нельзя.") },
+            title = { Text(language.deletePermanentlyTitle()) },
+            text = { Text(language.deletePermanentlyText(board.title)) },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch { repository.permanentlyDeleteBoard(board.id) }
                     confirmingDeleteBoard = null
-                }) { Text("Удалить навсегда", color = MaterialTheme.colorScheme.error) }
+                }) { Text(language.deletePermanently(), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmingDeleteBoard = null }) { Text("Отмена") }
+                TextButton(onClick = { confirmingDeleteBoard = null }) { Text(language.cancel()) }
             }
         )
     }

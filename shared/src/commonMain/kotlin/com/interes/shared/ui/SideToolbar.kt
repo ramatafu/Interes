@@ -113,7 +113,7 @@ fun SideToolbar(
             if (compact) {
                 TopBarGlyph(onClick = onOpenTrash) { TrashGlyph() }
             } else {
-                ToolbarIconButton(contentDescription = "Корзина", onClick = onOpenTrash) { TrashGlyph() }
+                ToolbarIconButton(contentDescription = LocalAppLanguage.current.trash(), onClick = onOpenTrash) { TrashGlyph() }
             }
         }
     }
@@ -130,8 +130,8 @@ fun SideToolbar(
  * там больше не вызывают — вместо неё используются CreateBoardButton,
  * BackupButton и AboutButton по отдельности.
  *
- * includeInfo — включает ли эта группа ещё и кнопку "О программе". По
- * умолчанию true (Desktop, без изменений).
+ * includeInfo — включает ли эта группа ещё и кнопку "О программе"/языковой
+ * тумблер. По умолчанию true (Desktop, без изменений).
  *
  * Сама функция не оборачивает кнопки в Row/Column — это делает вызывающая
  * сторона (см. выше), поэтому её можно вставить и в вертикальный, и в
@@ -148,12 +148,13 @@ fun PrimaryActionButtons(
     if (compact) {
         TopBarGlyph(onClick = onHome) { HomeGlyph() }
     } else {
-        ToolbarIconButton(contentDescription = "Домой", onClick = onHome) { HomeGlyph() }
+        ToolbarIconButton(contentDescription = LocalAppLanguage.current.home(), onClick = onHome) { HomeGlyph() }
     }
     CreateBoardButton(onCreateBoard = onCreateBoard, compact = compact)
     BackupButton(backupPaths = backupPaths, compact = compact)
     if (includeInfo) {
         AboutButton(compact = compact)
+        LanguageButton(compact = compact)
     }
 }
 
@@ -169,7 +170,7 @@ fun CreateBoardButton(onCreateBoard: () -> Unit, compact: Boolean) {
     if (compact) {
         TopBarGlyph(onClick = onCreateBoard) { PlusGlyph() }
     } else {
-        ToolbarIconButton(contentDescription = "Создать доску", onClick = onCreateBoard) { PlusGlyph() }
+        ToolbarIconButton(contentDescription = LocalAppLanguage.current.newBoardAction(), onClick = onCreateBoard) { PlusGlyph() }
     }
 }
 
@@ -186,19 +187,38 @@ fun BackupButton(backupPaths: BackupPaths, compact: Boolean) {
     var backupMenuExpanded by remember { mutableStateOf(false) }
     var backupResultMessage by remember { mutableStateOf<String?>(null) }
     var backupResultIsError by remember { mutableStateOf(false) }
+    // true только после УСПЕШНОГО restoreBackup — тогда в диалоге результата
+    // рядом с "OK" появляется вторая кнопка "Restart now" (см. ниже),
+    // которая реально убивает и перезапускает процесс (rememberAppRestarter
+    // в BackupActions.kt), а не просто просит пользователя сделать это
+    // руками (см. подробный doc-комментарий там же, почему одной просьбы
+    // недостаточно на Android).
+    var showRestartAction by remember { mutableStateOf(false) }
 
+    // Язык захватывается ЗДЕСЬ, в теле composable-функции (доступ к
+    // LocalAppLanguage.current есть) — onSuccess/onFailure ниже выполняются
+    // асинхронно, уже ВНЕ композиции (после закрытия системного диалога
+    // выбора файла), там LocalAppLanguage.current уже недоступен. Strings.kt
+    // поэтому и написан как extension-функции с явным параметром-получателем
+    // AppLanguage, а не @Composable — capturedLanguage работает в обоих
+    // контекстах одинаково.
+    val capturedLanguage = LocalAppLanguage.current
+
+    val restartApp = rememberAppRestarter()
     val createBackup = rememberBackupCreator(backupPaths) { result ->
         backupResultIsError = result.isFailure
+        showRestartAction = false
         backupResultMessage = result.fold(
-            onSuccess = { "Резервная копия успешно создана." },
-            onFailure = { "Не удалось создать копию: ${it.message ?: "неизвестная ошибка"}" }
+            onSuccess = { capturedLanguage.backupCreated() },
+            onFailure = { capturedLanguage.backupCreateFailed(it.message ?: "unknown error") }
         )
     }
     val restoreBackup = rememberBackupRestorer(backupPaths) { result ->
         backupResultIsError = result.isFailure
+        showRestartAction = result.isSuccess
         backupResultMessage = result.fold(
-            onSuccess = { "Восстановлено. Перезапустите Interes, чтобы изменения вступили в силу." },
-            onFailure = { "Не удалось восстановить: ${it.message ?: "неизвестная ошибка"}" }
+            onSuccess = { capturedLanguage.restoreSucceeded() },
+            onFailure = { capturedLanguage.restoreFailed(it.message ?: "unknown error") }
         )
     }
 
@@ -206,18 +226,18 @@ fun BackupButton(backupPaths: BackupPaths, compact: Boolean) {
         if (compact) {
             TopBarGlyph(onClick = { backupMenuExpanded = true }) { BackupGlyph() }
         } else {
-            ToolbarIconButton(contentDescription = "Резервная копия", onClick = { backupMenuExpanded = true }) { BackupGlyph() }
+            ToolbarIconButton(contentDescription = LocalAppLanguage.current.backup(), onClick = { backupMenuExpanded = true }) { BackupGlyph() }
         }
         DropdownMenu(expanded = backupMenuExpanded, onDismissRequest = { backupMenuExpanded = false }) {
             DropdownMenuItem(
-                text = { Text("Создать резервную копию") },
+                text = { Text(LocalAppLanguage.current.createBackup()) },
                 onClick = {
                     backupMenuExpanded = false
                     createBackup()
                 }
             )
             DropdownMenuItem(
-                text = { Text("Восстановить из резервной копии") },
+                text = { Text(LocalAppLanguage.current.restoreFromBackup()) },
                 onClick = {
                     backupMenuExpanded = false
                     restoreBackup()
@@ -229,92 +249,145 @@ fun BackupButton(backupPaths: BackupPaths, compact: Boolean) {
     backupResultMessage?.let { message ->
         AlertDialog(
             onDismissRequest = { backupResultMessage = null },
-            title = { Text(if (backupResultIsError) "Ошибка" else "Готово") },
+            title = { Text(if (backupResultIsError) LocalAppLanguage.current.error() else LocalAppLanguage.current.done()) },
             text = { Text(message) },
             confirmButton = {
-                TextButton(onClick = { backupResultMessage = null }) { Text("ОК") }
+                if (showRestartAction) {
+                    TextButton(onClick = { restartApp() }) { Text(LocalAppLanguage.current.restartNow()) }
+                } else {
+                    TextButton(onClick = { backupResultMessage = null }) { Text(LocalAppLanguage.current.ok()) }
+                }
+            },
+            // "OK" (закрыть без перезапуска) — только когда действительно есть
+            // выбор, т.е. когда основная confirmButton занята "Restart now".
+            dismissButton = {
+                if (showRestartAction) {
+                    TextButton(onClick = { backupResultMessage = null }) { Text(LocalAppLanguage.current.ok()) }
+                }
             }
         )
     }
 }
 
 /**
- * Кнопка "О программе" (глиф "!") + сам диалог с информацией о версии,
- * описанием, авторами и лицензией. Вынесена ОТДЕЛЬНО от PrimaryActionButtons
- * (Домой/+/Резервная копия), потому что на Android она теперь стоит не
- * рядом с ними, а в правом тулбаре на уровень корзины (см. RightToolbar.kt)
- * — на Desktop же по-прежнему вызывается ИЗНУТРИ PrimaryActionButtons
- * (includeInfo = true по умолчанию), то есть остаётся четвёртой кнопкой в
- * той же колонке, что и раньше.
+ * Кнопка-тумблер языка интерфейса (RU ⇄ EN) — глиф-глобус (LanguageGlyph в
+ * TopBarIcons.kt), подпись под ним показывает язык, НА КОТОРЫЙ переключит
+ * клик (см. switchToLanguageLabel в Strings.kt). Живёт рядом с AboutButton
+ * везде, где та появляется (PrimaryActionButtons на Desktop, нижняя панель
+ * BoardsListScreen.kt и RightToolbar.kt на Android) — та же логика
+ * размещения, что и у AboutButton, просто ещё одна кнопка в тех же местах.
+ */
+@Composable
+fun LanguageButton(compact: Boolean) {
+    val currentLanguage = LocalAppLanguage.current
+    val setLanguage = LocalAppLanguageSetter.current
+    val onClick = { setLanguage(currentLanguage.toggled()) }
+
+    if (compact) {
+        TopBarGlyph(onClick = onClick) { LanguageGlyph() }
+    } else {
+        ToolbarIconButton(contentDescription = currentLanguage.switchToLanguageLabel(), onClick = onClick) {
+            LanguageGlyph()
+        }
+    }
+}
+
+/**
+ * Кнопка "О программе" (глиф "!") — сама кнопка отдельно от диалога
+ * (AboutDialog ниже), потому что диалог теперь открывается ещё и с одного
+ * места без этой кнопки: с логотипа "In" в верхнем тулбаре главного экрана
+ * (см. AppRoot.kt) — там значок-восклицательный-знак больше не нужен
+ * отдельно, но сам диалог тот же самый.
+ *
+ * Кнопка вынесена ОТДЕЛЬНО от PrimaryActionButtons (Домой/+/Резервная
+ * копия), потому что на Android она стоит не рядом с ними, а в правом
+ * тулбаре на уровне корзины (см. RightToolbar.kt, актуально только для
+ * экрана доски — на главном экране Android кнопки уже нет вообще, см.
+ * BoardsListScreen.kt) — на Desktop же по-прежнему вызывается ИЗНУТРИ
+ * PrimaryActionButtons (includeInfo = true по умолчанию), то есть остаётся
+ * четвёртой кнопкой в той же колонке, что и раньше.
  */
 @Composable
 fun AboutButton(compact: Boolean) {
     var showInfoDialog by remember { mutableStateOf(false) }
+    val language = LocalAppLanguage.current
 
     if (compact) {
         TopBarGlyph(onClick = { showInfoDialog = true }) { InfoGlyph() }
     } else {
-        ToolbarIconButton(contentDescription = "О программе", onClick = { showInfoDialog = true }) { InfoGlyph() }
+        ToolbarIconButton(contentDescription = language.about(), onClick = { showInfoDialog = true }) { InfoGlyph() }
     }
 
-    if (showInfoDialog) {
-        val uriHandler = LocalUriHandler.current
-        val repoUrl = "https://github.com/ramatafu/Interes"
+    AboutDialog(show = showInfoDialog, onDismiss = { showInfoDialog = false })
+}
 
-        AlertDialog(
-            onDismissRequest = { showInfoDialog = false },
-            title = { Text("Interes") },
-            text = {
-                Column {
-                    Text("Версия 0.2.6", style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        "Оффлайн-приложение для досок визуализации: собирайте и организуйте фотографии по темам и категориям.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                    Text(
-                        "Разработка:",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(top = 12.dp)
-                    )
-                    Text(
-                        "Идея, дизайн, тестирование: ram",
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                    Text(
-                        "Генерация кода: Claude Code (Anthropic)",
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 2.dp)
-                    )
-                    Text(
-                        "Консультация: DeepSeek",
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 2.dp)
-                    )
-                    // Кликабельная ссылка на репозиторий — LocalUriHandler
-                    // общий для Compose Multiplatform (свой actual на
-                    // Android/Desktop), открывает системный браузер.
-                    Text(
-                        repoUrl,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .padding(top = 12.dp)
-                            .clickable { uriHandler.openUri(repoUrl) }
-                    )
-                    Text(
-                        "Лицензия: GNU General Public License v3.0 (GPLv3).",
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showInfoDialog = false }) { Text("Закрыть") }
+/**
+ * Сам диалог "О программе" (версия, описание, авторы, ссылка, лицензия) —
+ * без кнопки-триггера, чтобы им мог управлять кто угодно (AboutButton выше
+ * и логотип "In" в AppRoot.kt) через собственное show-состояние.
+ */
+@Composable
+fun AboutDialog(show: Boolean, onDismiss: () -> Unit) {
+    if (!show) return
+
+    val language = LocalAppLanguage.current
+    val uriHandler = LocalUriHandler.current
+    val repoUrl = "https://github.com/ramatafu/Interes"
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Interes") },
+        text = {
+            Column {
+                Text(language.appVersion("0.2.6"), style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    language.appDescription(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+                Text(
+                    language.developmentLabel(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = 12.dp)
+                )
+                Text(
+                    language.creditsIdea(),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+                Text(
+                    language.creditsCode(),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+                Text(
+                    language.creditsConsulting(),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+                // Кликабельная ссылка на репозиторий — LocalUriHandler
+                // общий для Compose Multiplatform (свой actual на
+                // Android/Desktop), открывает системный браузер. URL не
+                // переводится ни в каком языке.
+                Text(
+                    repoUrl,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .padding(top = 12.dp)
+                        .clickable { uriHandler.openUri(repoUrl) }
+                )
+                Text(
+                    language.license(),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
             }
-        )
-    }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(language.close()) }
+        }
+    )
 }
 
 /**

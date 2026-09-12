@@ -9,6 +9,7 @@ import com.interes.shared.repository.BoardRepository
 import com.interes.shared.storage.BackupPaths
 import com.interes.shared.storage.DatabaseDriverFactory
 import com.interes.shared.storage.PhotoFileStorage
+import com.interes.shared.ui.AppLanguageStorage
 import com.interes.shared.ui.InteresRoot
 import com.interes.shared.ui.NativeWindowController
 import kotlinx.coroutines.Dispatchers
@@ -19,6 +20,7 @@ fun main() = application {
     val db = InteresDatabase(driver)
     val repository = BoardRepository(db, PhotoFileStorage(), Dispatchers.IO)
     val backupPaths = BackupPaths()
+    val languageStorage = AppLanguageStorage()
 
     Window(
         onCloseRequest = ::exitApplication,
@@ -32,6 +34,6 @@ fun main() = application {
         transparent = true
     ) {
         val nativeWindowController = NativeWindowController(window)
-        InteresRoot(repository, backupPaths, nativeWindowController, onExitApp = ::exitApplication)
+        InteresRoot(repository, backupPaths, nativeWindowController, languageStorage, onExitApp = ::exitApplication)
     }
 }

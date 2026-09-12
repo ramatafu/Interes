@@ -91,7 +91,7 @@ fun RightToolbar(
                 if (compact) {
                     TopBarGlyph(onClick = onAddPhoto) { PlusGlyph() }
                 } else {
-                    ToolbarIconButton(contentDescription = "Добавить фото", onClick = onAddPhoto) { PlusGlyph() }
+                    ToolbarIconButton(contentDescription = LocalAppLanguage.current.addPhoto(), onClick = onAddPhoto) { PlusGlyph() }
                 }
             }
         }
@@ -149,14 +149,15 @@ fun RightToolbar(
             // Диалог ручного ввода процента прозрачности.
             if (showOpacityDialog) {
                 var input by remember { mutableStateOf(opacityPercent.toInt().toString()) }
+                val language = LocalAppLanguage.current
                 AlertDialog(
                     onDismissRequest = { showOpacityDialog = false },
-                    title = { Text("Прозрачность") },
+                    title = { Text(language.opacity()) },
                     text = {
                         OutlinedTextField(
                             value = input,
                             onValueChange = { input = it },
-                            label = { Text("Процент (0–100)") },
+                            label = { Text(language.percentLabel()) },
                             singleLine = true
                         )
                     },
@@ -168,10 +169,10 @@ fun RightToolbar(
                                 onOpacityChange(v.toFloat().coerceIn(0f, 100f))
                             }
                             showOpacityDialog = false
-                        }) { Text("Применить") }
+                        }) { Text(language.apply()) }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showOpacityDialog = false }) { Text("Отмена") }
+                        TextButton(onClick = { showOpacityDialog = false }) { Text(language.cancel()) }
                     }
                 )
             }
@@ -189,6 +190,7 @@ fun RightToolbar(
             ) {
                 HorizontalDivider(color = Color.White.copy(alpha = 0.3f), modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
                 AboutButton(compact = compact)
+                LanguageButton(compact = compact)
             }
         }
     }

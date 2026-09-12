@@ -30,7 +30,7 @@ object BackupManager {
 
     fun createBackup(paths: BackupPaths, destinationZipPath: String): Result<Unit> = runCatching {
         val dbFile = File(paths.databaseFilePath)
-        require(dbFile.exists()) { "Файл базы данных не найден: ${paths.databaseFilePath}" }
+        require(dbFile.exists()) { "Database file not found: ${paths.databaseFilePath}" }
 
         val destFile = File(destinationZipPath)
         destFile.parentFile?.mkdirs()
@@ -74,7 +74,7 @@ object BackupManager {
      */
     fun restoreBackup(paths: BackupPaths, sourceZipPath: String): Result<Unit> = runCatching {
         val sourceFile = File(sourceZipPath)
-        require(sourceFile.exists()) { "Файл резервной копии не найден: $sourceZipPath" }
+        require(sourceFile.exists()) { "Backup file not found: $sourceZipPath" }
 
         val stagingDir = File(File(paths.databaseFilePath).parentFile, "restore_staging").apply {
             deleteRecursively()
@@ -102,7 +102,7 @@ object BackupManager {
                 }
             }
 
-            val db = restoredDb ?: error("В архиве нет файла базы данных (interes.db) — это не резервная копия Interes")
+            val db = restoredDb ?: error("No database file (interes.db) found in the archive — this is not an Interes backup")
 
             // Только теперь, когда распаковка ПОЛНОСТЬЮ удалась, заменяем
             // настоящие файлы. db.copyTo(overwrite = true) вместо rename —

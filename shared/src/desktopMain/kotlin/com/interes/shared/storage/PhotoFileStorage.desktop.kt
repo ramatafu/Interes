@@ -8,7 +8,7 @@ actual class PhotoFileStorage {
 
     actual fun importPhoto(sourcePath: String): ImportedPhotoFile {
         val sourceFile = File(sourcePath)
-        require(sourceFile.exists()) { "Файл не найден: $sourcePath" }
+        require(sourceFile.exists()) { "File not found: $sourcePath" }
 
         val appDataDir = File(System.getenv("APPDATA") ?: System.getProperty("user.home"), "Interes/photos")
         appDataDir.mkdirs()
@@ -20,7 +20,7 @@ actual class PhotoFileStorage {
         sourceFile.copyTo(destFile, overwrite = true)
 
         val image = ImageIO.read(destFile)
-            ?: error("Файл не распознан как изображение: $sourcePath")
+            ?: error("File not recognized as an image: $sourcePath")
 
         return ImportedPhotoFile(
             storedPath = destFile.absolutePath,
