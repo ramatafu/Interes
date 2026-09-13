@@ -38,7 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.interes.shared.generated.resources.Res
-import com.interes.shared.generated.resources.app_icon
+import com.interes.shared.generated.resources.logo_in
 import com.interes.shared.model.Photo
 import com.interes.shared.repository.BoardRepository
 import com.interes.shared.storage.BackupPaths
@@ -461,11 +461,18 @@ fun InteresRoot(
                             contentAlignment = Alignment.Center
                         ) {
                             Image(
-                                painter = painterResource(Res.drawable.app_icon),
+                                // Новый глянцевый значок "in" — с прозрачным
+                                // фоном (в исходнике был сплошной светло-
+                                // серый фон, вырезан отдельно от app_icon.png:
+                                // тот отдельно используется как иконка окна
+                                // на Desktop, см. Main.kt, трогать его не
+                                // просили). clip(RoundedCornerShape) больше
+                                // не нужен — раньше скруглял угол квадратной
+                                // картинки с тёмной виньеткой, сейчас фон и
+                                // так прозрачный, скруглять нечего.
+                                painter = painterResource(Res.drawable.logo_in),
                                 contentDescription = LocalAppLanguage.current.about(),
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .clip(RoundedCornerShape(6.dp))
+                                modifier = Modifier.size(30.dp)
                             )
                         }
                         AboutDialog(show = showAboutDialog, onDismiss = { showAboutDialog = false })
@@ -480,15 +487,23 @@ fun InteresRoot(
                         OutlinedTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
-                            placeholder = { Text(LocalAppLanguage.current.searchPlaceholder()) },
-                            leadingIcon = { SearchGlyph(color = MaterialTheme.colorScheme.onSurface) },
+                            placeholder = { Text(LocalAppLanguage.current.searchPlaceholder(), color = Color.White.copy(alpha = 0.7f)) },
+                            leadingIcon = { SearchGlyph(color = Color.White) },
                             singleLine = true,
                             shape = RoundedCornerShape(50),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = Color.Transparent,
                                 unfocusedBorderColor = Color.Transparent,
                                 focusedContainerColor = Color.White.copy(alpha = 0.35f),
-                                unfocusedContainerColor = Color.White.copy(alpha = 0.35f)
+                                unfocusedContainerColor = Color.White.copy(alpha = 0.35f),
+                                // Текст, который печатает пользователь, и
+                                // курсор — по умолчанию OutlinedTextField
+                                // берёт тёмный onSurface из темы (AppTheme.kt),
+                                // почти нечитаемый на полупрозрачной белой
+                                // "таблетке" поверх тёмного TopToolbarColor.
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                cursorColor = Color.White
                             ),
                             modifier = Modifier
                                 .align(Alignment.CenterStart)

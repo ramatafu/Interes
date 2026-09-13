@@ -339,7 +339,7 @@ fun AboutDialog(show: Boolean, onDismiss: () -> Unit) {
         title = { Text("Interes") },
         text = {
             Column {
-                Text(language.appVersion("0.2.6"), style = MaterialTheme.typography.bodyMedium)
+                Text(language.appVersion("0.2.7"), style = MaterialTheme.typography.bodyMedium)
                 Text(
                     language.appDescription(),
                     style = MaterialTheme.typography.bodyMedium,
