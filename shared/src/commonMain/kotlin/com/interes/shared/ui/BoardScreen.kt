@@ -1,7 +1,12 @@
 package com.interes.shared.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
@@ -21,8 +26,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import com.interes.shared.model.Photo
 import com.interes.shared.repository.BoardRepository
 import kotlinx.coroutines.launch
@@ -108,41 +115,83 @@ fun BoardScreen(
         // цвет, что и у тулбаров: 92B1B7.
         containerColor = SideToolbarColor,
         topBar = {
-            TopAppBar(
-                modifier = Modifier.height(TopToolbarHeight),
-                // "Свернуть/Развернуть/Закрыть" здесь БОЛЬШЕ НЕ рисуются —
-                // эта TopAppBar инсетится по бокам под SideToolbar/RightToolbar
-                // (см. padding вокруг контента в AppRoot.kt), поэтому её
-                // правый край не совпадает с настоящим краем ОКНА — кнопки
-                // оказывались левее, чем на главном экране. Теперь кнопки
-                // рисует AppRoot.kt поверх правого угла-заполнителя, у
-                // истинного края окна — там же, где и на главном экране.
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = TopToolbarColor,
-                    // "Назад" и название доски — белым: раньше брали цвет
-                    // по умолчанию из светлой ColorScheme (тёмный, почти
-                    // чёрный) и терялись на тёмном фоне панели.
-                    navigationIconContentColor = Color.White,
-                    titleContentColor = Color.White
-                ),
-                title = {
-                    // windowDragHandle — см. тот же приём в BoardsListScreen.kt.
-                    Text(boardTitle, modifier = Modifier.windowDragHandle(nativeWindowController))
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        // Без material-icons-extended — просто стрелка текстом.
-                        Text("\u2190", style = MaterialTheme.typography.titleLarge)
-                    }
-                },
-                actions = {
-                    if (showAddPhotoInTopBar) {
-                        IconButton(onClick = pickImages) {
-                            PlusGlyph()
+            // На Desktop — самописная панель вместо TopAppBar: у Material3
+            // TopAppBar есть свой фиксированный внутренний отступ перед
+            // navigationIcon (плюс сам IconButton — 48.dp с иконкой по
+            // центру), и на Desktop это давало заметный лишний зазор ПОСЛЕ
+            // бокового тулбара — стрелка "Назад" и название комнаты не
+            // доходили до истинного левого края доступной области. На
+            // Android того же зазора не видно (там эта же панель и так уже
+            // начинается от истинного края экрана, см. hideSideBars в
+            // AppRoot.kt, — привычно для мобильных экранов), поэтому там
+            // оставлен прежний TopAppBar без изменений — просили поправить
+            // только Windows-сборку.
+            //
+            // Эта же панель видна и во время просмотра фото — сам
+            // просмотрщик рисуется поверх, НИЖЕ её высоты (см. отступ в
+            // AppRoot.kt), панель не перерисовывается отдельно для этого
+            // режима.
+            if (nativeWindowController.primaryActionsInTopBar) {
+                TopAppBar(
+                    modifier = Modifier.height(TopToolbarHeight),
+                    // "Свернуть/Развернуть/Закрыть" здесь БОЛЬШЕ НЕ рисуются —
+                    // эта TopAppBar инсетится по бокам под SideToolbar/RightToolbar
+                    // (см. padding вокруг контента в AppRoot.kt), поэтому её
+                    // правый край не совпадает с настоящим краем ОКНА — кнопки
+                    // оказывались левее, чем на главном экране. Теперь кнопки
+                    // рисует AppRoot.kt поверх правого угла-заполнителя, у
+                    // истинного края окна — там же, где и на главном экране.
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = TopToolbarColor,
+                        // "Назад" и название доски — белым: раньше брали цвет
+                        // по умолчанию из светлой ColorScheme (тёмный, почти
+                        // чёрный) и терялись на тёмном фоне панели.
+                        navigationIconContentColor = Color.White,
+                        titleContentColor = Color.White
+                    ),
+                    title = {
+                        // windowDragHandle — см. тот же приём в BoardsListScreen.kt.
+                        Text(boardTitle, modifier = Modifier.windowDragHandle(nativeWindowController))
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            // Без material-icons-extended — просто стрелка текстом.
+                            Text("\u2190", style = MaterialTheme.typography.titleLarge)
+                        }
+                    },
+                    actions = {
+                        if (showAddPhotoInTopBar) {
+                            IconButton(onClick = pickImages) {
+                                PlusGlyph()
+                            }
                         }
                     }
+                )
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(TopToolbarHeight)
+                        .background(TopToolbarColor),
+                    horizontalArrangement = Arrangement.Start,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // size(40.dp) вместо дефолтных 48.dp у IconButton — тот же
+                    // приём, что и в TrashScreen.kt: меньше лишнего поля вокруг
+                    // глифа, стрелка оказывается заметно ближе к истинному
+                    // левому краю доступной области (после бокового тулбара).
+                    IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
+                        Text("\u2190", style = MaterialTheme.typography.titleLarge, color = Color.White)
+                    }
+                    // windowDragHandle — см. тот же приём в BoardsListScreen.kt.
+                    Text(
+                        boardTitle,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color.White,
+                        modifier = Modifier.windowDragHandle(nativeWindowController)
+                    )
                 }
-            )
+            }
         },
         // FloatingActionButton "+" убран — см. onPickImagesReady выше:
         // кнопка добавления фото теперь на правом тулбаре (AppRoot.kt).
