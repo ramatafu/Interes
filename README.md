@@ -1,3 +1,4 @@
+<img width="1536" height="1024" alt="изображение" src="https://github.com/user-attachments/assets/1e585cfd-05a3-47f5-8219-673b239477dc" />
 # Interes
 
 Оффлайн-приложение для Android и Windows в духе Pinterest: тематические доски
